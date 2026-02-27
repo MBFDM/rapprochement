@@ -1,56 +1,13 @@
-# ======================== CORE DEPENDENCIES ========================
 streamlit>=1.28.0
 pandas>=2.0.0
 numpy>=1.24.0
-python-dateutil>=2.8.2
-
-# ======================== VISUALIZATION ========================
 plotly>=5.17.0
 streamlit-option-menu>=0.3.6
-
-# ======================== DATABASE ========================
-sqlite3  # inclus dans Python standard
-
-# ======================== SECURITY & ENCRYPTION ========================
 bcrypt>=4.0.0
 cryptography>=41.0.0
-passlib>=1.7.4
-
-# ======================== FILE PROCESSING ========================
-openpyxl>=3.1.0          # Pour les fichiers Excel
-xlrd>=2.0.0              # Pour les anciens fichiers Excel
-xlsxwriter>=3.1.0        # Alternative pour écrire Excel
-python-docx>=0.8.11      # Pour les fichiers Word
-docx2pdf>=0.1.8          # Conversion Word vers PDF
-PyMuPDF>=1.23.0          # Pour la manipulation de PDF (fitz)
-
-# ======================== IMAGE PROCESSING ========================
-Pillow>=10.0.0           # Pour le traitement d'images
-
-# ======================== EMAIL ========================
-# smtplib inclus dans Python standard
-email-validator>=2.0.0   # Validation d'emails
-
-# ======================== FILE OPERATIONS ========================
-# shutil, glob, tempfile inclus dans Python standard
-
-# ======================== UTILITIES ========================
-uuid  # inclus dans Python standard
-re    # inclus dans Python standard
-logging # inclus dans Python standard
-warnings # inclus dans Python standard
-contextlib # inclus dans Python standard
-
-# ======================== DATA ANALYSIS ========================
-scipy>=1.11.0            # Pour des analyses statistiques avancées
-statsmodels>=0.14.0      # Pour les modèles statistiques
-
-# ======================== DEVELOPMENT TOOLS ========================
-# Optionnel - pour le développement
-pytest>=7.4.0            # Pour les tests
-black>=23.0.0            # Formateur de code
-flake8>=6.0.0            # Linter
-mypy>=1.5.0              # Type checking
-
-# ======================== VERSION SPECIFICATIONS ========================
-# Python version: 3.9 ou supérieure recommandée
+openpyxl>=3.1.0
+python-docx>=0.8.11
+docx2pdf>=0.1.8
+PyMuPDF>=1.23.0
+Pillow>=10.0.0
+scipy>=1.11.0
