@@ -1,0 +1,36 @@
+2026-02-27 12:18:53,227 - WARNING - Échec connexion - Tentative pour user
+2026-02-27 12:19:12,492 - WARNING - Échec connexion - Tentative pour admin
+2026-02-27 12:20:08,887 - INFO - Connexion - Utilisateur admin connecté
+2026-02-27 12:26:44,174 - INFO - Traitement technique - 24535 enregistrements traités
+2026-02-27 12:26:44,191 - INFO - Import technique - 24535 lignes importées
+2026-02-27 12:30:50,640 - INFO - Traitement comptable - 41973 enregistrements traités
+2026-02-27 12:30:50,640 - INFO - Import comptable - 41973 lignes importées
+2026-02-27 12:31:05,372 - ERROR - Erreur rapprochement - 'Police_tech'
+2026-02-27 12:33:01,046 - ERROR - Erreur rapprochement - 'Police_tech'
+2026-02-27 12:33:09,513 - ERROR - Erreur critique - can only concatenate str (not "int") to str
+2026-02-27 12:34:01,924 - INFO - Ajout utilisateur - Utilisateur user ajouté
+2026-02-27 12:34:32,338 - ERROR - Erreur critique - can only concatenate str (not "int") to str
+2026-02-27 12:34:40,801 - ERROR - Erreur critique - can only concatenate str (not "int") to str
+2026-02-27 12:34:53,803 - ERROR - Erreur rapprochement - 'Police_tech'
+2026-02-27 12:37:45,675 - INFO - Rapprochement - 43876 polices communes
+2026-02-27 12:37:47,647 - INFO - Rapprochement technique - 43876 polices analysées
+2026-02-27 12:43:38,889 - INFO - Rapprochement - 43876 polices communes
+2026-02-27 12:43:40,637 - INFO - Rapprochement technique - 43876 polices analysées
+2026-02-27 12:43:43,565 - INFO - Rapprochement - 43876 polices communes
+2026-02-27 12:44:06,029 - INFO - Connexion - Utilisateur user connecté
+2026-02-27 12:58:38,600 - INFO - Connexion - Utilisateur user connecté
+2026-02-27 13:14:41,836 - INFO - Déconnexion - Utilisateur user déconnecté
+2026-02-27 13:22:54,777 - INFO - Connexion - Utilisateur user connecté
+2026-02-27 13:23:21,281 - ERROR - Erreur critique - 'PageGestionTechnique' object has no attribute '_render_analysis_tab'
+2026-02-27 13:23:27,427 - ERROR - Erreur critique - 'PageGestionTechnique' object has no attribute '_render_analysis_tab'
+2026-02-27 13:32:02,258 - INFO - Connexion - Utilisateur user connecté
+2026-02-27 13:34:53,169 - INFO - Connexion - Utilisateur user connecté
+2026-02-27 13:35:14,934 - INFO - Connexion - Utilisateur user connecté
+2026-02-27 13:47:36,580 - INFO - Traitement comptable - 41973 enregistrements traités
+2026-02-27 13:47:36,583 - INFO - Import comptable - 41973 lignes importées
+2026-02-27 13:50:38,697 - INFO - Traitement technique - 24535 enregistrements traités
+2026-02-27 13:50:38,730 - INFO - Import technique - 24535 lignes importées
+2026-02-27 13:51:15,179 - INFO - Rapprochement - 43876 polices communes
+2026-02-27 13:51:19,663 - INFO - Rapprochement technique - 43876 polices analysées
+2026-02-27 13:53:46,946 - INFO - Rapprochement - 43876 polices communes
+2026-02-27 13:53:54,215 - INFO - Rapprochement technique - 43876 polices analysées
