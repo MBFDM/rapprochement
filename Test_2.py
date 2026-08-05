@@ -1,6 +1,6 @@
 """
 Application de Gestion Technique et Comptable AGC-VIE
-Version Streamlit - Design adaptatif (Black, Light, System)
+Version Streamlit - Conversion complète de l'application Tkinter
 Auteur: Frédéric BAYONNE MAVOUNGOU
 Date: 2025
 """
@@ -17,13 +17,16 @@ import re
 import uuid
 import time
 import json
+import base64
 import hashlib
 import sqlite3
 import logging
 import shutil
 import warnings
+from contextlib import contextmanager
 from typing import Optional, Dict, List, Any, Tuple
 from pathlib import Path
+import tempfile
 
 # Tentative d'import des modules optionnels
 try:
@@ -31,12 +34,33 @@ try:
 except ImportError:
     bcrypt = None
 
+try:
+    from cryptography.fernet import Fernet
+except ImportError:
+    Fernet = None
+
+try:
+    from docx import Document
+    from docx.shared import Pt, RGBColor
+except ImportError:
+    Document = None
+
+try:
+    from docx2pdf import convert
+except ImportError:
+    convert = None
+
+try:
+    import fitz
+except ImportError:
+    fitz = None
+
 warnings.filterwarnings('ignore')
 
 # ======================== CONFIGURATION DE LA PAGE ========================
 st.set_page_config(
     page_title="AGC-VIE - Gestion Technique et Comptable",
-    page_icon="📊",
+    page_icon="logo_1.jpg",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
@@ -53,477 +77,135 @@ PERMISSIONS_LIST = [
     "settings_manage", "logs_view", "logs_manage"
 ]
 
-# ======================== GESTION DES THÈMES ========================
-def get_theme_colors(theme_name=None):
-    """Retourne les couleurs selon le thème sélectionné"""
-    
-    # Thèmes prédéfinis
-    themes = {
-        "light": {
-            "primary": "#1e3c72",
-            "primary_light": "#2a5298",
-            "secondary": "#764ba2",
-            "background": "#ffffff",
-            "background_secondary": "#f8f9fa",
-            "text": "#1a1a2e",
-            "text_secondary": "#4a4a6a",
-            "card_bg": "#ffffff",
-            "card_shadow": "rgba(0,0,0,0.1)",
-            "sidebar_bg": "#f0f2f6",
-            "success": "#28a745",
-            "warning": "#ffc107",
-            "danger": "#dc3545",
-            "info": "#17a2b8",
-            "border": "#e0e0e0",
-            "hover": "#f5f5f5"
-        },
-        "dark": {
-            "primary": "#4a8fc1",
-            "primary_light": "#6aa8d4",
-            "secondary": "#9b6ab8",
-            "background": "#0e1117",
-            "background_secondary": "#1a1d24",
-            "text": "#f0f2f6",
-            "text_secondary": "#b0b2b6",
-            "card_bg": "#1a1d24",
-            "card_shadow": "rgba(0,0,0,0.5)",
-            "sidebar_bg": "#262730",
-            "success": "#28a745",
-            "warning": "#ffc107",
-            "danger": "#dc3545",
-            "info": "#17a2b8",
-            "border": "#2d3038",
-            "hover": "#262730"
-        }
-    }
-    
-    # Déterminer le thème
-    if theme_name is None:
-        theme_name = st.session_state.get('theme', 'system')
-    
-    if theme_name == 'system':
-        # Détection automatique du thème système
-        import streamlit as st
-        # Utiliser le thème actuel de Streamlit
-        is_dark = st.get_option('theme.base') == 'dark'
-        theme_name = 'dark' if is_dark else 'light'
-    
-    return themes.get(theme_name, themes['light'])
-
-def apply_theme_css():
-    """Applique les styles CSS selon le thème actuel"""
-    
-    theme = st.session_state.get('theme', 'system')
-    colors = get_theme_colors(theme)
-    
-    # Déterminer si le thème est sombre
-    is_dark = theme == 'dark'
-    
-    # Styles adaptatifs
-    st.markdown(f"""
+# ======================== STYLES CSS PERSONNALISÉS ========================
+def apply_custom_css():
+    """Applique les styles CSS personnalisés"""
+    st.markdown("""
     <style>
-        /* Variables de thème */
-        :root {{
-            --primary-color: {colors['primary']};
-            --primary-light: {colors['primary_light']};
-            --secondary-color: {colors['secondary']};
-            --bg-color: {colors['background']};
-            --bg-secondary: {colors['background_secondary']};
-            --text-color: {colors['text']};
-            --text-secondary: {colors['text_secondary']};
-            --card-bg: {colors['card_bg']};
-            --card-shadow: {colors['card_shadow']};
-            --sidebar-bg: {colors['sidebar_bg']};
-            --border-color: {colors['border']};
-            --hover-color: {colors['hover']};
-        }}
-        
         /* Style global */
-        .stApp {{
-            background-color: var(--bg-color);
-            color: var(--text-color);
+        .stApp {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }}
+        }
         
         /* En-têtes */
-        h1, h2, h3, h4, h5, h6 {{
-            color: var(--text-color);
+        h1, h2, h3 {
+            color: #1e3c72;
             font-weight: 600;
-        }}
+            margin-bottom: 1rem;
+        }
         
-        h1 {{
+        h1 {
             font-size: 2.5rem;
-            border-bottom: 3px solid var(--primary-color);
+            border-bottom: 3px solid #1e3c72;
             padding-bottom: 0.5rem;
-        }}
+        }
         
-        h2 {{
+        h2 {
             font-size: 2rem;
-            border-bottom: 2px solid var(--primary-light);
+            border-bottom: 2px solid #2a5298;
             padding-bottom: 0.3rem;
-        }}
+        }
         
         /* Cartes métriques */
-        .metric-card {{
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            padding: 20px;
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 10px;
             border-radius: 15px;
             color: white;
             text-align: center;
-            box-shadow: 0 10px 30px var(--card-shadow);
-            transition: transform 0.3s, box-shadow 0.3s;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s;
             margin: 10px 0;
-        }}
+        }
         
-        .metric-card:hover {{
+        .metric-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 15px 40px var(--card-shadow);
-        }}
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
         
-        .metric-card h3 {{
+        .metric-card h3 {
             color: white;
             font-size: 1.2em;
             margin-bottom: 10px;
             opacity: 0.9;
-        }}
+        }
         
-        .metric-card p {{
+        .metric-card p {
             font-size: 2.2em;
             font-weight: bold;
             margin: 0;
-        }}
+        }
         
         /* Conteneurs */
-        .content-card {{
-            background: var(--card-bg);
+        .content-card {
+            background: white;
             padding: 20px;
             border-radius: 15px;
-            box-shadow: 0 10px 30px var(--card-shadow);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             margin: 20px 0;
-            transition: transform 0.3s, box-shadow 0.3s;
-            border: 1px solid var(--border-color);
-        }}
+            transition: transform 0.3s;
+        }
         
-        .content-card:hover {{
+        .content-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 15px 40px var(--card-shadow);
-        }}
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+        }
         
         /* Badges */
-        .badge {{
+        .badge {
             display: inline-block;
             padding: 5px 10px;
             border-radius: 20px;
             font-size: 0.85em;
             font-weight: 600;
             text-align: center;
-        }}
+        }
         
-        .badge-success {{
+        .badge-success {
             background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
             color: white;
-        }}
+        }
         
-        .badge-warning {{
+        .badge-warning {
             background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
-            color: #1a1a2e;
-        }}
+            color: black;
+        }
         
-        .badge-danger {{
+        .badge-danger {
             background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
             color: white;
-        }}
+        }
         
-        .badge-info {{
+        .badge-info {
             background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
             color: white;
-        }}
-        
-        /* Barre latérale */
-        .css-1d391kg, .st-emotion-cache-1d391kg {{
-            background: var(--sidebar-bg);
-            border-right: 1px solid var(--border-color);
-        }}
-        
-        /* Éléments de la barre latérale */
-        .sidebar-content {{
-            color: var(--text-color);
-        }}
-        
-        /* Pied de page */
-        .footer {{
-            text-align: center;
-            padding: 20px;
-            color: var(--text-secondary);
-            font-size: 0.9em;
-            border-top: 1px solid var(--border-color);
-            margin-top: 40px;
-        }}
+        }
         
         /* Animations */
-        @keyframes fadeIn {{
-            from {{ opacity: 0; transform: translateY(20px); }}
-            to {{ opacity: 1; transform: translateY(0); }}
-        }}
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
         
-        .fade-in {{
+        .fade-in {
             animation: fadeIn 0.5s ease-out;
-        }}
+        }
         
-        /* Tableaux */
-        .stDataFrame {{
-            border-radius: 10px;
-            overflow: hidden;
-        }}
-        
-        .stDataFrame table {{
-            border-collapse: collapse;
-            width: 100%;
-        }}
-        
-        .stDataFrame thead tr th {{
-            background: var(--primary-color) !important;
-            color: white !important;
-            padding: 12px !important;
-            font-weight: 600 !important;
-        }}
-        
-        .stDataFrame tbody tr:hover {{
-            background: var(--hover-color) !important;
-        }}
-        
-        /* Inputs */
-        .stTextInput > div > div > input,
-        .stSelectbox > div > div > select,
-        .stNumberInput > div > div > input {{
-            border-radius: 8px;
-            border: 2px solid var(--border-color);
-            padding: 10px;
-            transition: all 0.3s;
-            background: var(--card-bg);
-            color: var(--text-color);
-        }}
-        
-        .stTextInput > div > div > input:focus,
-        .stSelectbox > div > div > select:focus,
-        .stNumberInput > div > div > input:focus {{
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(30, 60, 114, 0.1);
-        }}
-        
-        /* Boutons */
-        .stButton > button {{
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
-            color: white;
-            border-radius: 8px;
-            padding: 12px 24px;
-            font-weight: 600;
-            border: none;
-            transition: all 0.3s;
-            box-shadow: 0 4px 6px var(--card-shadow);
-            width: 100%;
-        }}
-        
-        .stButton > button:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px var(--card-shadow);
-        }}
-        
-        .stButton > button:active {{
-            transform: translateY(0);
-        }}
-        
-        /* Messages */
-        .stAlert {{
-            border-radius: 10px;
-            border-left: 5px solid;
-            box-shadow: 0 4px 6px var(--card-shadow);
-        }}
-        
-        .stSuccess {{
-            background: rgba(40, 167, 69, 0.1) !important;
-            border-left-color: #28a745 !important;
-            color: var(--text-color) !important;
-        }}
-        
-        .stError {{
-            background: rgba(220, 53, 69, 0.1) !important;
-            border-left-color: #dc3545 !important;
-            color: var(--text-color) !important;
-        }}
-        
-        .stWarning {{
-            background: rgba(255, 193, 7, 0.1) !important;
-            border-left-color: #ffc107 !important;
-            color: var(--text-color) !important;
-        }}
-        
-        .stInfo {{
-            background: rgba(23, 162, 184, 0.1) !important;
-            border-left-color: #17a2b8 !important;
-            color: var(--text-color) !important;
-        }}
-        
-        /* Scrollbar personnalisée */
-        ::-webkit-scrollbar {{
-            width: 10px;
-            height: 10px;
-        }}
-        
-        ::-webkit-scrollbar-track {{
-            background: var(--bg-secondary);
-            border-radius: 5px;
-        }}
-        
-        ::-webkit-scrollbar-thumb {{
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
-            border-radius: 5px;
-        }}
-        
-        ::-webkit-scrollbar-thumb:hover {{
-            background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary-color) 100%);
-        }}
-        
-        /* Onglets adaptatifs */
-        .stTabs [data-baseweb="tab-list"] {{
-            gap: 8px;
-            background-color: var(--bg-secondary);
-            padding: 0.5rem;
-            border-radius: 10px;
-            border: 1px solid var(--border-color);
-        }}
-        
-        .stTabs [data-baseweb="tab"] {{
-            background: var(--card-bg);
-            border-radius: 8px;
-            padding: 12px 24px;
-            font-weight: 600;
-            color: var(--text-color) !important;
-            transition: all 0.3s;
-            border: 1px solid var(--border-color);
-        }}
-        
-        .stTabs [data-baseweb="tab"]:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px var(--card-shadow);
-        }}
-        
-        .stTabs [aria-selected="true"] {{
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%) !important;
-            color: white !important;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px var(--card-shadow);
-            border-color: var(--primary-color);
-        }}
-        
-        /* Métriques Streamlit */
-        .stMetric {{
-            background: var(--card-bg);
-            padding: 15px;
-            border-radius: 10px;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 2px 8px var(--card-shadow);
-        }}
-        
-        .stMetric label {{
-            color: var(--text-secondary) !important;
-        }}
-        
-        .stMetric .stMetricValue {{
-            color: var(--text-color) !important;
-        }}
-        
-        /* Switch pour le thème */
-        .theme-switch {{
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px;
-            background: var(--card-bg);
-            border-radius: 10px;
-            border: 1px solid var(--border-color);
-            margin-bottom: 20px;
-        }}
-        
-        .theme-switch label {{
-            color: var(--text-color);
-            font-weight: 500;
-        }}
-        
-        /* Responsive */
-        @media (max-width: 768px) {{
-            .stTabs [data-baseweb="tab"] {{
-                padding: 8px 12px;
-                font-size: 0.9em;
-            }}
-            
-            .metric-card p {{
-                font-size: 1.5em;
-            }}
-            
-            h1 {{
-                font-size: 2rem;
-            }}
-            
-            h2 {{
-                font-size: 1.5rem;
-            }}
-        }}
-        
-        /* Thème sombre spécifique */
-        {'/* Dark theme specific */' if is_dark else ''}
-        {f'''
-        .stApp {{
-            background-color: #0e1117;
-        }}
-        
-        .stDataFrame thead tr th {{
-            background: #1a1d24 !important;
-        }}
-        
-        .stDataFrame tbody tr td {{
-            background: #1a1d24 !important;
-            color: #f0f2f6 !important;
-        }}
-        
-        .stDataFrame tbody tr:hover td {{
-            background: #262730 !important;
-        }}
-        ''' if is_dark else ''}
-        
-        /* Thème clair spécifique */
-        {'/* Light theme specific */' if not is_dark else ''}
-        {f'''
-        .stApp {{
-            background-color: #ffffff;
-        }}
-        ''' if not is_dark else ''}
+        /* Pied de page */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+            font-size: 0.9em;
+            border-top: 1px solid #e0e0e0;
+            margin-top: 40px;
+        }
     </style>
     """, unsafe_allow_html=True)
-    
-    # Appliquer les couleurs aux graphiques Plotly
-    update_plotly_theme(theme)
-
-def update_plotly_theme(theme):
-    """Met à jour le thème des graphiques Plotly"""
-    
-    template = 'plotly_dark' if theme == 'dark' else 'plotly_white'
-    
-    # Configurer le template par défaut
-    import plotly.io as pio
-    pio.templates.default = template
-    
-    # Mettre à jour les couleurs des graphiques existants
-    if 'plotly_theme_updated' not in st.session_state:
-        st.session_state.plotly_theme_updated = True
 
 # ======================== INITIALISATION DE LA SESSION ========================
 def init_session_state():
     """Initialise toutes les variables de session"""
-    
-    # Thème
-    if 'theme' not in st.session_state:
-        st.session_state.theme = 'system'  # 'light', 'dark', 'system'
     
     # Authentification
     if 'authenticated' not in st.session_state:
@@ -633,6 +315,7 @@ def log_action(action, details="", level="info"):
     
     st.session_state.logs.append(log_entry)
     
+    # Garder seulement les 1000 derniers logs
     if len(st.session_state.logs) > 1000:
         st.session_state.logs = st.session_state.logs[-1000:]
 
@@ -651,6 +334,7 @@ def log_history(action_type, target_user=None, details="", data=None):
     
     st.session_state.history.append(history_entry)
     
+    # Garder seulement les 500 derniers historiques
     if len(st.session_state.history) > 500:
         st.session_state.history = st.session_state.history[-500:]
 
@@ -662,6 +346,7 @@ class SecurityManager:
     def hash_password(password):
         """Hash un mot de passe avec bcrypt"""
         if bcrypt is None:
+            # Fallback si bcrypt n'est pas installé
             return hashlib.sha256(password.encode('utf-8')).hexdigest()
         salt = bcrypt.gensalt()
         return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
@@ -670,6 +355,7 @@ class SecurityManager:
     def verify_password(hashed_password, plain_password):
         """Vérifie un mot de passe"""
         if bcrypt is None:
+            # Fallback si bcrypt n'est pas installé
             return hashed_password == hashlib.sha256(plain_password.encode('utf-8')).hexdigest()
         try:
             return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
@@ -736,6 +422,7 @@ class DatabaseHandler:
             conn = sqlite3.connect(self.db_file)
             cursor = conn.cursor()
             
+            # Table des utilisateurs
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -751,6 +438,7 @@ class DatabaseHandler:
                 )
             """)
             
+            # Table des logs
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS logs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -763,6 +451,7 @@ class DatabaseHandler:
                 )
             """)
             
+            # Table de l'historique
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -775,6 +464,7 @@ class DatabaseHandler:
                 )
             """)
             
+            # Table des paramètres
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS settings (
                     key TEXT PRIMARY KEY,
@@ -784,6 +474,7 @@ class DatabaseHandler:
                 )
             """)
             
+            # Créer un admin par défaut si nécessaire
             cursor.execute("SELECT COUNT(*) FROM users WHERE role='admin'")
             if cursor.fetchone()[0] == 0:
                 default_password = SecurityManager.hash_password("Admin123!")
@@ -799,6 +490,7 @@ class DatabaseHandler:
             st.error(f"Erreur d'initialisation de la base de données: {str(e)}")
     
     def execute_query(self, query, params=()):
+        """Exécute une requête SQL"""
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
         cursor.execute(query, params)
@@ -807,6 +499,7 @@ class DatabaseHandler:
         return cursor
     
     def fetch_all(self, query, params=()):
+        """Récupère tous les résultats d'une requête"""
         conn = sqlite3.connect(self.db_file)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -816,6 +509,7 @@ class DatabaseHandler:
         return [dict(row) for row in rows]
     
     def fetch_one(self, query, params=()):
+        """Récupère un seul résultat"""
         conn = sqlite3.connect(self.db_file)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -826,7 +520,9 @@ class DatabaseHandler:
 
 # ======================== FONCTIONS D'AUTHENTIFICATION ========================
 def login(username, password):
+    """Authentifie un utilisateur"""
     try:
+        # Vérifier les tentatives
         can_login, message = SecurityManager.check_login_attempts()
         if not can_login:
             st.error(message)
@@ -839,6 +535,7 @@ def login(username, password):
         )
         
         if user and SecurityManager.verify_password(user['password'], password):
+            # Succès
             st.session_state.authenticated = True
             st.session_state.username = username
             st.session_state.role = user['role']
@@ -846,6 +543,7 @@ def login(username, password):
             st.session_state.locked_until = None
             st.session_state.last_activity = datetime.now()
             
+            # Mettre à jour la dernière connexion
             db.execute_query(
                 "UPDATE users SET last_login = ? WHERE username = ?",
                 (datetime.now(), username)
@@ -856,6 +554,7 @@ def login(username, password):
             
             return True
         else:
+            # Échec
             is_locked, message = SecurityManager.record_failed_attempt()
             if is_locked:
                 st.error(message)
@@ -871,6 +570,7 @@ def login(username, password):
         return False
 
 def logout():
+    """Déconnecte l'utilisateur"""
     if st.session_state.authenticated:
         username = st.session_state.username
         log_action("Déconnexion", f"Utilisateur {username} déconnecté")
@@ -882,6 +582,7 @@ def logout():
     st.rerun()
 
 def check_session_timeout():
+    """Vérifie si la session a expiré"""
     if st.session_state.authenticated:
         timeout = st.session_state.security_config.get('session_timeout', 30) * 60
         last_activity = st.session_state.last_activity
@@ -896,26 +597,32 @@ def check_session_timeout():
     return False
 
 def update_last_activity():
+    """Met à jour le timestamp de dernière activité"""
     if st.session_state.authenticated:
         st.session_state.last_activity = datetime.now()
 
 # ======================== FONCTIONS DE GESTION DES UTILISATEURS ========================
 def get_all_users():
+    """Récupère tous les utilisateurs"""
     db = DatabaseHandler()
     return db.fetch_all("SELECT id, username, email, role, status, last_login, created_at FROM users ORDER BY username")
 
 def add_user(username, password, email, role="user"):
+    """Ajoute un nouvel utilisateur"""
     try:
+        # Valider le mot de passe
         valid, errors = SecurityManager.validate_password_strength(password)
         if not valid:
             return False, "\n".join(errors)
         
         db = DatabaseHandler()
         
+        # Vérifier si l'utilisateur existe déjà
         existing = db.fetch_one("SELECT username FROM users WHERE username = ?", (username,))
         if existing:
             return False, "Ce nom d'utilisateur existe déjà"
         
+        # Ajouter l'utilisateur
         hashed_password = SecurityManager.hash_password(password)
         db.execute_query(
             "INSERT INTO users (username, password, email, role, status) VALUES (?, ?, ?, ?, ?)",
@@ -932,6 +639,7 @@ def add_user(username, password, email, role="user"):
         return False, f"Erreur: {str(e)}"
 
 def update_user(username, data):
+    """Met à jour un utilisateur"""
     try:
         db = DatabaseHandler()
         
@@ -964,6 +672,7 @@ def update_user(username, data):
         return False, f"Erreur: {str(e)}"
 
 def delete_user(username):
+    """Supprime un utilisateur"""
     try:
         if username == "admin":
             return False, "Impossible de supprimer le compte admin"
@@ -982,10 +691,15 @@ def delete_user(username):
 
 # ======================== FONCTIONS DE TRAITEMENT DES DONNÉES ========================
 def process_technique_data(df):
+    """Traite les données techniques"""
     try:
+        # Copie pour éviter les modifications sur l'original
         df = df.copy()
+        
+        # Nettoyage des noms de colonnes
         df.columns = df.columns.str.strip()
         
+        # Ajout de la colonne Nouvelle_Police si nécessaire
         if all(col in df.columns for col in ['Num avenant', 'Code intermédiaire', 'N° police']):
             df['Nouvelle_Police'] = df.apply(
                 lambda row: f"{row['Code intermédiaire']}-{row['N° police']}/{row['Num avenant']}" 
@@ -994,9 +708,11 @@ def process_technique_data(df):
                 axis=1
             )
         
+        # Nettoyage de la colonne police
         if 'Nouvelle_Police' in df.columns:
             df['Nouvelle_Police'] = df['Nouvelle_Police'].astype(str).str.replace('.0', '', regex=False)
         
+        # Calcul des ristournes et émissions
         if 'Type quittance' in df.columns and 'Chiffre affaire' in df.columns:
             df['Ristournes'] = df.apply(
                 lambda row: row['Chiffre affaire'] if str(row['Type quittance']).strip() == 'Ristourne' else 0, 
@@ -1007,6 +723,7 @@ def process_technique_data(df):
                 axis=1
             )
         
+        # Tableau croisé dynamique
         index_col = 'Nouvelle_Police' if 'Nouvelle_Police' in df.columns else df.columns[0]
         value_cols = []
         
@@ -1018,6 +735,7 @@ def process_technique_data(df):
             value_cols = df.select_dtypes(include=[np.number]).columns.tolist()
         
         if value_cols and index_col in df.columns:
+            # Convertir les colonnes numériques
             for col in value_cols:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             
@@ -1040,18 +758,25 @@ def process_technique_data(df):
         return df
 
 def process_comptable_data(df):
+    """Traite les données comptables"""
     try:
+        # Copie pour éviter les modifications sur l'original
         df = df.copy()
+        
+        # Nettoyage des noms de colonnes
         df.columns = df.columns.str.strip()
         
+        # Nettoyage des colonnes de police
         if 'No Police' in df.columns:
             df['No Police'] = df['No Police'].astype(str).str.replace('.0', '', regex=False)
         
+        # Conversion numérique
         numeric_cols = ['Débit', 'Crédit', 'Montant']
         for col in numeric_cols:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
+        # Tableau croisé dynamique
         index_col = 'No Police' if 'No Police' in df.columns else df.columns[0]
         value_cols = df.select_dtypes(include=[np.number]).columns.tolist()
         
@@ -1075,8 +800,10 @@ def process_comptable_data(df):
         return df
 
 def detect_duplicates(df, police_column='NUMERO POLICE'):
+    """Détecte les doublons dans un DataFrame"""
     try:
         if police_column not in df.columns:
+            # Chercher une colonne qui pourrait contenir les polices
             for col in df.columns:
                 if 'police' in col.lower() or 'num' in col.lower():
                     police_column = col
@@ -1084,6 +811,7 @@ def detect_duplicates(df, police_column='NUMERO POLICE'):
             else:
                 return None, None, "Colonne de police non trouvée"
         
+        # Identifier les doublons
         duplicates_mask = df.duplicated(subset=[police_column], keep=False)
         duplicates_df = df[duplicates_mask].sort_values(police_column)
         uniques_df = df[~duplicates_mask]
@@ -1103,22 +831,28 @@ def detect_duplicates(df, police_column='NUMERO POLICE'):
         return None, None, str(e)
 
 def rapprochement_technique_comptable(tech_df, compta_df):
+    """Effectue le rapprochement entre données techniques et comptables"""
     try:
+        # Copie des DataFrames
         tech = tech_df.copy()
         compta = compta_df.copy()
         
+        # Déterminer les colonnes de jointure
         tech_col = 'Nouvelle_Police' if 'Nouvelle_Police' in tech.columns else tech.columns[0]
         compta_col = 'No Police' if 'No Police' in compta.columns else compta.columns[0]
         
+        # Renommer pour la fusion
         tech_renamed = tech.rename(columns={tech_col: 'Police'})
         compta_renamed = compta.rename(columns={compta_col: 'Police'})
         
+        # Conversion numérique
         for col in ['Emissions', 'Ristournes', 'Débit', 'Crédit']:
             if col in tech_renamed.columns:
                 tech_renamed[col] = pd.to_numeric(tech_renamed[col], errors='coerce').fillna(0)
             if col in compta_renamed.columns:
                 compta_renamed[col] = pd.to_numeric(compta_renamed[col], errors='coerce').fillna(0)
         
+        # Fusion
         merged = pd.merge(
             tech_renamed, 
             compta_renamed, 
@@ -1127,6 +861,7 @@ def rapprochement_technique_comptable(tech_df, compta_df):
             suffixes=('_tech', '_compta')
         )
         
+        # Calcul des écarts
         if 'Emissions_tech' in merged.columns and 'Débit_compta' in merged.columns and 'Crédit_compta' in merged.columns:
             merged['CA_Technique'] = merged['Emissions_tech']
             merged['CA_Comptable'] = abs(merged['Crédit_compta'] - merged['Débit_compta'])
@@ -1135,6 +870,7 @@ def rapprochement_technique_comptable(tech_df, compta_df):
                 lambda x: 'Rapproché' if abs(x) < 0.01 else 'Non rapproché'
             )
         
+        # Statistiques
         stats = {
             'total_polices': len(merged),
             'polices_techniques': len(tech_renamed),
@@ -1157,10 +893,12 @@ def rapprochement_technique_comptable(tech_df, compta_df):
         return None, str(e)
 
 def validate_references(df, ref_column='Réf Pièce'):
+    """Valide les références selon un pattern"""
     try:
         if ref_column not in df.columns:
             return None, "Colonne de référence non trouvée"
         
+        # Pattern pour validation
         pattern = r"^\w+-\d+(?:/\d+)?$"
         
         valid_refs = []
@@ -1187,12 +925,14 @@ def validate_references(df, ref_column='Réf Pièce'):
 
 # ======================== FONCTIONS D'EXPORT ========================
 def export_to_excel(dataframes, sheet_names, filename="export.xlsx"):
+    """Exporte plusieurs DataFrames vers un fichier Excel"""
     try:
         output = io.BytesIO()
         
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             for df, sheet_name in zip(dataframes, sheet_names):
                 if df is not None and not df.empty:
+                    # Limiter le nom de la feuille à 31 caractères
                     safe_name = sheet_name[:31]
                     df.to_excel(writer, sheet_name=safe_name, index=False)
         
@@ -1206,6 +946,7 @@ def export_to_excel(dataframes, sheet_names, filename="export.xlsx"):
         return None
 
 def export_to_csv(df, filename="export.csv"):
+    """Exporte un DataFrame vers CSV"""
     try:
         return df.to_csv(index=False).encode('utf-8')
     except Exception as e:
@@ -1213,6 +954,7 @@ def export_to_csv(df, filename="export.csv"):
         return None
 
 def create_download_button(data, filename, button_text, mime_type=None):
+    """Crée un bouton de téléchargement"""
     if mime_type is None:
         if filename.endswith('.csv'):
             mime_type = 'text/csv'
@@ -1231,6 +973,7 @@ def create_download_button(data, filename, button_text, mime_type=None):
 
 # ======================== COMPOSANTS D'INTERFACE ========================
 def display_metric_card(title, value, icon="📊", description=""):
+    """Affiche une carte métrique stylisée"""
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown(f"""
@@ -1242,6 +985,7 @@ def display_metric_card(title, value, icon="📊", description=""):
         """, unsafe_allow_html=True)
 
 def display_badge(text, type="info"):
+    """Affiche un badge stylisé"""
     colors = {
         "success": "badge-success",
         "warning": "badge-warning",
@@ -1252,6 +996,7 @@ def display_badge(text, type="info"):
     st.markdown(f'<span class="badge {css_class}">{text}</span>', unsafe_allow_html=True)
 
 def create_search_bar(key, placeholder="Rechercher..."):
+    """Crée une barre de recherche"""
     search = st.text_input(
         "🔍",
         placeholder=placeholder,
@@ -1261,6 +1006,7 @@ def create_search_bar(key, placeholder="Rechercher..."):
     return search
 
 def filter_dataframe(df, search_term):
+    """Filtre un DataFrame selon un terme de recherche"""
     if not search_term or df is None or df.empty:
         return df
     
@@ -1273,6 +1019,7 @@ def filter_dataframe(df, search_term):
         return df
 
 def create_pagination(df, key_prefix, items_per_page=None):
+    """Crée une pagination pour un DataFrame"""
     if items_per_page is None:
         items_per_page = st.session_state.user_preferences.get('items_per_page', 50)
     
@@ -1286,6 +1033,7 @@ def create_pagination(df, key_prefix, items_per_page=None):
     
     current_page = st.session_state[f'{key_prefix}_page']
     
+    # Contrôles de pagination
     if total_pages > 1:
         col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
         
@@ -1312,65 +1060,23 @@ def create_pagination(df, key_prefix, items_per_page=None):
                 st.session_state[f'{key_prefix}_page'] = total_pages - 1
                 st.rerun()
     
+    # Extraire la page courante
     start_idx = current_page * items_per_page
     end_idx = min(start_idx + items_per_page, len(df))
     
     return df.iloc[start_idx:end_idx], start_idx, end_idx
 
-# ======================== SÉLECTEUR DE THÈME ========================
-def theme_selector():
-    """Composant de sélection de thème"""
-    with st.sidebar:
-        st.markdown("---")
-        st.markdown("### 🎨 Thème")
-        
-        current_theme = st.session_state.get('theme', 'system')
-        
-        # Utiliser des colonnes pour les boutons radio horizontaux
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("☀️", key="theme_light", 
-                        help="Thème clair",
-                        use_container_width=True):
-                st.session_state.theme = 'light'
-                st.rerun()
-        
-        with col2:
-            if st.button("🌙", key="theme_dark",
-                        help="Thème sombre",
-                        use_container_width=True):
-                st.session_state.theme = 'dark'
-                st.rerun()
-        
-        with col3:
-            if st.button("💻", key="theme_system",
-                        help="Thème système",
-                        use_container_width=True):
-                st.session_state.theme = 'system'
-                st.rerun()
-        
-        # Indicateur du thème actif
-        theme_names = {
-            'light': '☀️ Clair',
-            'dark': '🌙 Sombre',
-            'system': '💻 Système'
-        }
-        st.caption(f"Actif: {theme_names.get(current_theme, 'Système')}")
-        
-        # Appliquer le thème immédiatement
-        apply_theme_css()
-
 # ======================== PAGES DE L'APPLICATION ========================
 
 def page_login():
+    """Page de connexion"""
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
         st.markdown("""
         <div style="text-align: center; padding: 40px; animation: fadeIn 0.5s;">
-            <h1 style="font-size: 3em; margin-bottom: 10px;">AGC-VIE</h1>
-            <p style="font-size: 1.2em; margin-bottom: 30px; opacity: 0.8;">
+            <h1 style="color: #1e3c72; font-size: 3em; margin-bottom: 10px;">AGC-VIE</h1>
+            <p style="color: #666; font-size: 1.2em; margin-bottom: 30px;">
                 Système de Gestion Technique et Comptable
             </p>
         </div>
@@ -1381,13 +1087,15 @@ def page_login():
             
             username = st.text_input(
                 "👤 Nom d'utilisateur",
-                placeholder="Entrez votre nom d'utilisateur"
+                placeholder="Entrez votre nom d'utilisateur",
+                help="Votre nom d'utilisateur AGC-VIE"
             )
             
             password = st.text_input(
                 "🔒 Mot de passe",
                 type="password",
-                placeholder="Entrez votre mot de passe"
+                placeholder="Entrez votre mot de passe",
+                help="Votre mot de passe sécurisé"
             )
             
             submitted = st.form_submit_button(
@@ -1407,24 +1115,26 @@ def page_login():
                     st.warning("Veuillez remplir tous les champs")
         
         st.markdown("""
-        <div style="text-align: center; font-size: 0.9em; margin-top: 20px; opacity: 0.7;">
+        <div style="text-align: center; color: #666; font-size: 0.9em; margin-top: 20px;">
             <p>Compte démo: admin / Admin123!</p>
             <p>© 2025 AGC-VIE - Tous droits réservés</p>
         </div>
         """, unsafe_allow_html=True)
 
 def page_accueil():
+    """Page d'accueil"""
     update_last_activity()
     
     st.markdown("""
-    <div class="content-card fade-in" style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%); text-align: center; color: white;">
+    <div class="content-card fade-in" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); text-align: center;">
         <h1 style="color: white;">Bienvenue sur AGC-VIE</h1>
-        <p style="color: white; font-size: 1.2em; opacity: 0.9;">
+        <p style="color: white; font-size: 1.2em;">
             Système intégré de Gestion Technique et Comptable
         </p>
     </div>
     """, unsafe_allow_html=True)
     
+    # Métriques rapides
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -1461,6 +1171,7 @@ def page_accueil():
                 help="Chiffre d'affaires comptable"
             )
     
+    # Modules disponibles
     st.markdown("## 🚀 Modules disponibles")
     
     col1, col2 = st.columns(2)
@@ -1524,10 +1235,12 @@ def page_accueil():
         """, unsafe_allow_html=True)
 
 def page_gestion_technique():
+    """Page de gestion technique"""
     update_last_activity()
     
     st.markdown("## 📊 Gestion Technique")
     
+    # Onglets
     tab1, tab2, tab3 = st.tabs(["📥 Import", "📋 Données", "📈 Analyses"])
     
     with tab1:
@@ -1543,6 +1256,7 @@ def page_gestion_technique():
         if uploaded_file:
             with st.spinner("Chargement du fichier en cours..."):
                 try:
+                    # Lecture du fichier
                     if uploaded_file.name.endswith('.csv'):
                         df = pd.read_csv(uploaded_file, dtype=str)
                     else:
@@ -1550,9 +1264,11 @@ def page_gestion_technique():
                     
                     st.session_state.df_technique = df
                     
+                    # Aperçu
                     st.markdown("### Aperçu des données")
                     st.dataframe(df.head(10), use_container_width=True)
                     
+                    # Statistiques
                     col1, col2, col3 = st.columns(3)
                     with col1:
                         st.metric("Lignes", len(df))
@@ -1561,6 +1277,7 @@ def page_gestion_technique():
                     with col3:
                         st.metric("Taille", f"{uploaded_file.size / 1024:.1f} KB")
                     
+                    # Traitement
                     if st.button("🔄 Traiter les données", type="primary", use_container_width=True):
                         with st.spinner("Traitement en cours..."):
                             pivot_df = process_technique_data(df)
@@ -1579,16 +1296,20 @@ def page_gestion_technique():
         if st.session_state.pivot_techniques is not None:
             st.markdown("### Données techniques traitées")
             
+            # Recherche
             search = create_search_bar("tech_search", "Rechercher une police...")
             
+            # Filtrage
             df_display = st.session_state.pivot_techniques.copy()
             if search:
                 df_display = filter_dataframe(df_display, search)
             
+            # Pagination
             df_page, start, end = create_pagination(df_display, "tech")
             
             st.markdown(f"**Affichage {start+1}-{end} sur {len(df_display)} enregistrements**")
             
+            # Affichage
             st.dataframe(
                 df_page,
                 use_container_width=True,
@@ -1596,6 +1317,7 @@ def page_gestion_technique():
                 hide_index=True
             )
             
+            # Export
             col1, col2 = st.columns(2)
             
             with col1:
@@ -1630,6 +1352,7 @@ def page_gestion_technique():
             
             df = st.session_state.pivot_techniques
             
+            # Sélection des colonnes numériques
             numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
             
             if numeric_cols:
@@ -1647,11 +1370,13 @@ def page_gestion_technique():
                         ["Histogramme", "Box plot", "Courbe"]
                     )
                 
+                # Statistiques descriptives
                 st.markdown("#### Statistiques descriptives")
                 stats_df = df[selected_col].describe().reset_index()
                 stats_df.columns = ['Statistique', 'Valeur']
                 st.dataframe(stats_df, use_container_width=True, hide_index=True)
                 
+                # Graphique
                 st.markdown("#### Visualisation")
                 
                 if chart_type == "Histogramme":
@@ -1660,29 +1385,27 @@ def page_gestion_technique():
                         x=selected_col,
                         nbins=30,
                         title=f"Distribution de {selected_col}",
-                        color_discrete_sequence=[get_theme_colors()['primary']]
+                        color_discrete_sequence=['#1e3c72']
                     )
                 elif chart_type == "Box plot":
                     fig = px.box(
                         df,
                         y=selected_col,
                         title=f"Box plot de {selected_col}",
-                        color_discrete_sequence=[get_theme_colors()['primary']]
+                        color_discrete_sequence=['#1e3c72']
                     )
                 else:
                     fig = px.line(
                         df.reset_index(),
                         y=selected_col,
                         title=f"Évolution de {selected_col}",
-                        color_discrete_sequence=[get_theme_colors()['primary']]
+                        color_discrete_sequence=['#1e3c72']
                     )
                 
-                fig.update_layout(
-                    height=500,
-                    template='plotly_dark' if st.session_state.get('theme') == 'dark' else 'plotly_white'
-                )
+                fig.update_layout(height=500)
                 st.plotly_chart(fig, use_container_width=True)
                 
+                # Top valeurs
                 st.markdown("#### Top 10 des valeurs")
                 top_df = df.nlargest(10, selected_col)[df.columns[:3]]
                 st.dataframe(top_df, use_container_width=True, hide_index=True)
@@ -1693,10 +1416,12 @@ def page_gestion_technique():
             st.info("Aucune donnée à analyser")
 
 def page_gestion_comptable():
+    """Page de gestion comptable"""
     update_last_activity()
     
     st.markdown("## 💰 Gestion Comptable")
     
+    # Onglets
     tab1, tab2, tab3 = st.tabs(["📥 Import", "📋 Données", "📈 Analyses"])
     
     with tab1:
@@ -1712,6 +1437,7 @@ def page_gestion_comptable():
         if uploaded_file:
             with st.spinner("Chargement du fichier en cours..."):
                 try:
+                    # Lecture du fichier
                     if uploaded_file.name.endswith('.csv'):
                         df = pd.read_csv(uploaded_file, dtype=str)
                     else:
@@ -1719,9 +1445,11 @@ def page_gestion_comptable():
                     
                     st.session_state.df_comptable = df
                     
+                    # Aperçu
                     st.markdown("### Aperçu des données")
                     st.dataframe(df.head(10), use_container_width=True)
                     
+                    # Statistiques
                     col1, col2, col3 = st.columns(3)
                     with col1:
                         st.metric("Lignes", len(df))
@@ -1730,6 +1458,7 @@ def page_gestion_comptable():
                     with col3:
                         st.metric("Taille", f"{uploaded_file.size / 1024:.1f} KB")
                     
+                    # Traitement
                     if st.button("🔄 Traiter les données", type="primary", use_container_width=True):
                         with st.spinner("Traitement en cours..."):
                             pivot_df = process_comptable_data(df)
@@ -1748,16 +1477,20 @@ def page_gestion_comptable():
         if st.session_state.pivot_comptables is not None:
             st.markdown("### Données comptables traitées")
             
+            # Recherche
             search = create_search_bar("compta_search", "Rechercher une police...")
             
+            # Filtrage
             df_display = st.session_state.pivot_comptables.copy()
             if search:
                 df_display = filter_dataframe(df_display, search)
             
+            # Pagination
             df_page, start, end = create_pagination(df_display, "compta")
             
             st.markdown(f"**Affichage {start+1}-{end} sur {len(df_display)} enregistrements**")
             
+            # Affichage
             st.dataframe(
                 df_page,
                 use_container_width=True,
@@ -1765,6 +1498,7 @@ def page_gestion_comptable():
                 hide_index=True
             )
             
+            # Export
             col1, col2 = st.columns(2)
             
             with col1:
@@ -1799,6 +1533,7 @@ def page_gestion_comptable():
             
             df = st.session_state.pivot_comptables
             
+            # Sélection des colonnes numériques
             numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
             
             if numeric_cols:
@@ -1816,11 +1551,13 @@ def page_gestion_comptable():
                         ["Histogramme", "Box plot", "Courbe"]
                     )
                 
+                # Statistiques descriptives
                 st.markdown("#### Statistiques descriptives")
                 stats_df = df[selected_col].describe().reset_index()
                 stats_df.columns = ['Statistique', 'Valeur']
                 st.dataframe(stats_df, use_container_width=True, hide_index=True)
                 
+                # Graphique
                 st.markdown("#### Visualisation")
                 
                 if chart_type == "Histogramme":
@@ -1829,29 +1566,27 @@ def page_gestion_comptable():
                         x=selected_col,
                         nbins=30,
                         title=f"Distribution de {selected_col}",
-                        color_discrete_sequence=[get_theme_colors()['primary']]
+                        color_discrete_sequence=['#1e3c72']
                     )
                 elif chart_type == "Box plot":
                     fig = px.box(
                         df,
                         y=selected_col,
                         title=f"Box plot de {selected_col}",
-                        color_discrete_sequence=[get_theme_colors()['primary']]
+                        color_discrete_sequence=['#1e3c72']
                     )
                 else:
                     fig = px.line(
                         df.reset_index(),
                         y=selected_col,
                         title=f"Évolution de {selected_col}",
-                        color_discrete_sequence=[get_theme_colors()['primary']]
+                        color_discrete_sequence=['#1e3c72']
                     )
                 
-                fig.update_layout(
-                    height=500,
-                    template='plotly_dark' if st.session_state.get('theme') == 'dark' else 'plotly_white'
-                )
+                fig.update_layout(height=500)
                 st.plotly_chart(fig, use_container_width=True)
                 
+                # Solde total
                 if 'Débit' in df.columns and 'Crédit' in df.columns:
                     total_debit = df['Débit'].sum()
                     total_credit = df['Crédit'].sum()
@@ -1871,10 +1606,12 @@ def page_gestion_comptable():
             st.info("Aucune donnée à analyser")
 
 def page_rapprochement_technique():
+    """Page de rapprochement technique"""
     update_last_activity()
     
     st.markdown("## 🔄 Rapprochement Technique")
     
+    # Vérification des données
     if st.session_state.pivot_techniques is None:
         st.warning("⚠️ Données techniques manquantes. Veuillez d'abord importer les données techniques.")
         return
@@ -1883,6 +1620,7 @@ def page_rapprochement_technique():
         st.warning("⚠️ Données comptables manquantes. Veuillez d'abord importer les données comptables.")
         return
     
+    # Effectuer le rapprochement
     with st.spinner("Calcul du rapprochement en cours..."):
         merged_df, stats = rapprochement_technique_comptable(
             st.session_state.pivot_techniques,
@@ -1892,6 +1630,7 @@ def page_rapprochement_technique():
     if merged_df is not None:
         st.session_state.stats['total_verifications'] += 1
         
+        # Métriques
         st.markdown("### 📊 Résumé du rapprochement")
         
         col1, col2, col3, col4 = st.columns(4)
@@ -1925,11 +1664,13 @@ def page_rapprochement_technique():
                 "📈" if ecart >= 0 else "📉"
             )
         
+        # Tabs pour les différentes vues
         tab1, tab2, tab3 = st.tabs(["📋 Données complètes", "❌ Non rapprochées", "✅ Rapprochées"])
         
         with tab1:
             st.markdown("### Toutes les polices")
             
+            # Recherche
             search = create_search_bar("rapprochement_search", "Rechercher une police...")
             
             df_display = merged_df.copy()
@@ -1947,6 +1688,7 @@ def page_rapprochement_technique():
                 if not non_rapproche.empty:
                     st.dataframe(non_rapproche, use_container_width=True, height=500, hide_index=True)
                     
+                    # Export des non rapprochées
                     if st.button("📥 Exporter les non rapprochées", use_container_width=True):
                         output = export_to_excel(
                             [non_rapproche],
@@ -1971,11 +1713,13 @@ def page_rapprochement_technique():
                 if not rapproche.empty:
                     st.dataframe(rapproche, use_container_width=True, height=500, hide_index=True)
         
+        # Visualisations
         st.markdown("### 📊 Visualisations")
         
         col1, col2 = st.columns(2)
         
         with col1:
+            # Graphique des statuts
             if 'Statut' in merged_df.columns:
                 status_counts = merged_df['Statut'].value_counts()
                 
@@ -1986,25 +1730,20 @@ def page_rapprochement_technique():
                     color_discrete_sequence=['#28a745', '#dc3545'],
                     hole=0.3
                 )
-                fig.update_layout(
-                    height=400,
-                    template='plotly_dark' if st.session_state.get('theme') == 'dark' else 'plotly_white'
-                )
+                fig.update_layout(height=400)
                 st.plotly_chart(fig, use_container_width=True)
         
         with col2:
+            # Graphique des écarts
             if 'Écart' in merged_df.columns:
                 fig = px.histogram(
                     merged_df[merged_df['Écart'].notna()],
                     x='Écart',
                     nbins=50,
                     title="Distribution des écarts",
-                    color_discrete_sequence=[get_theme_colors()['primary']]
+                    color_discrete_sequence=['#1e3c72']
                 )
-                fig.update_layout(
-                    height=400,
-                    template='plotly_dark' if st.session_state.get('theme') == 'dark' else 'plotly_white'
-                )
+                fig.update_layout(height=400)
                 st.plotly_chart(fig, use_container_width=True)
         
         log_action("Rapprochement technique", f"{len(merged_df)} polices analysées")
@@ -2013,10 +1752,12 @@ def page_rapprochement_technique():
         st.error(f"Erreur lors du rapprochement: {stats}")
 
 def page_rapprochement_comptable():
+    """Page de rapprochement comptable"""
     update_last_activity()
     
     st.markdown("## 🔄 Rapprochement Comptable")
     
+    # Vérification des données
     if st.session_state.pivot_techniques is None:
         st.warning("⚠️ Données techniques manquantes. Veuillez d'abord importer les données techniques.")
         return
@@ -2027,17 +1768,21 @@ def page_rapprochement_comptable():
     
     with st.spinner("Calcul du rapprochement comptable en cours..."):
         try:
+            # Récupérer les données
             df_tech = st.session_state.pivot_techniques.copy()
             df_compta = st.session_state.pivot_comptables.copy()
             
+            # Déterminer les colonnes de police
             tech_col = 'Nouvelle_Police' if 'Nouvelle_Police' in df_tech.columns else df_tech.columns[0]
             compta_col = 'No Police' if 'No Police' in df_compta.columns else df_compta.columns[0]
             
+            # Ajouter les colonnes techniques aux données comptables
             df_compta['Ristournes'] = 0
             df_compta['Emissions'] = 0
             df_compta['Statut_Ristournes'] = 'Non trouvé'
             df_compta['Statut_Emissions'] = 'Non trouvé'
             
+            # Pour chaque ligne comptable, chercher la correspondance
             for index, row in df_compta.iterrows():
                 police_compta = str(row[compta_col]).strip()
                 
@@ -2052,10 +1797,12 @@ def page_rapprochement_comptable():
                         df_compta.at[index, 'Emissions'] = pd.to_numeric(correspondance['Emissions'].values[0], errors='coerce')
                         df_compta.at[index, 'Statut_Emissions'] = 'Trouvé'
             
+            # Conversion en numérique
             for col in ['Crédit', 'Débit', 'Emissions', 'Ristournes']:
                 if col in df_compta.columns:
                     df_compta[col] = pd.to_numeric(df_compta[col], errors='coerce').fillna(0)
             
+            # Calcul du rapprochement
             if all(col in df_compta.columns for col in ['Crédit', 'Débit', 'Emissions', 'Ristournes']):
                 df_compta['CA_Comptable'] = df_compta['Crédit'] - df_compta['Débit']
                 df_compta['CA_Technique'] = df_compta['Emissions'] + df_compta['Ristournes']
@@ -2066,9 +1813,11 @@ def page_rapprochement_comptable():
                     axis=1
                 )
             
+            # Séparer valides et invalides
             df_invalide = df_compta[df_compta['Rapprochement'] == 'Non rapproché'] if 'Rapprochement' in df_compta.columns else pd.DataFrame()
             df_valide = df_compta[df_compta['Rapprochement'] == 'Rapproché'] if 'Rapprochement' in df_compta.columns else pd.DataFrame()
             
+            # Statistiques
             stats = {
                 'total_debit': df_compta['Débit'].sum() if 'Débit' in df_compta.columns else 0,
                 'total_credit': df_compta['Crédit'].sum() if 'Crédit' in df_compta.columns else 0,
@@ -2082,6 +1831,7 @@ def page_rapprochement_comptable():
                 'polices_invalides': len(df_invalide)
             }
             
+            # Stockage dans la session
             st.session_state.pivot_comptables_complet = df_compta
             st.session_state.tableau_listing_police_invalide_comptable = df_invalide
             st.session_state.tableau_listing_valide_comptable = df_valide
@@ -2093,9 +1843,11 @@ def page_rapprochement_comptable():
             log_action("Erreur rapprochement comptable", str(e), level="error")
             return
     
+    # Affichage des résultats
     if stats:
         st.session_state.stats['total_verifications'] += 1
         
+        # Métriques principales
         st.markdown("### 📊 Résumé du rapprochement comptable")
         
         col1, col2, col3, col4 = st.columns(4)
@@ -2128,6 +1880,7 @@ def page_rapprochement_comptable():
                 "📈"
             )
         
+        # Deuxième ligne de métriques
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -2164,11 +1917,13 @@ def page_rapprochement_comptable():
                 f"Taux: {taux_invalides:.1f}%"
             )
         
+        # Tabs pour les différentes vues
         tab1, tab2, tab3 = st.tabs(["📋 Données complètes", "❌ Non rapprochées", "✅ Rapprochées"])
         
         with tab1:
             st.markdown("### Toutes les polices comptables")
             
+            # Recherche
             search = create_search_bar("compta_rapprochement_search", "Rechercher une police...")
             
             df_display = st.session_state.pivot_comptables_complet.copy()
@@ -2218,11 +1973,13 @@ def page_rapprochement_comptable():
                 
                 st.dataframe(df_valide_display, use_container_width=True, height=500, hide_index=True)
         
+        # Visualisations
         st.markdown("### 📊 Analyses et visualisations")
         
         col1, col2 = st.columns(2)
         
         with col1:
+            # Graphique de répartition des statuts
             df_invalide = st.session_state.tableau_listing_police_invalide_comptable
             df_valide = st.session_state.tableau_listing_valide_comptable
             
@@ -2240,13 +1997,13 @@ def page_rapprochement_comptable():
                 fig.update_layout(
                     title="Répartition des polices comptables",
                     height=400,
-                    showlegend=True,
-                    template='plotly_dark' if st.session_state.get('theme') == 'dark' else 'plotly_white'
+                    showlegend=True
                 )
                 
                 st.plotly_chart(fig, use_container_width=True)
         
         with col2:
+            # Graphique de comparaison des montants
             if stats:
                 fig = go.Figure(data=[
                     go.Bar(
@@ -2263,17 +2020,18 @@ def page_rapprochement_comptable():
                     title="Comparaison CA Comptable vs Technique",
                     yaxis_title="Montant (FCFA)",
                     height=400,
-                    showlegend=False,
-                    template='plotly_dark' if st.session_state.get('theme') == 'dark' else 'plotly_white'
+                    showlegend=False
                 )
                 
                 st.plotly_chart(fig, use_container_width=True)
 
 def page_gestion_410_411():
+    """Page de gestion 410 et 411"""
     update_last_activity()
     
     st.markdown("## 📋 Gestion 410 & 411")
     
+    # Onglets
     tab1, tab2, tab3, tab4 = st.tabs(["📥 Import 410", "📥 Import 411", "🔍 Vérifications", "📊 Analyses"])
     
     with tab1:
@@ -2436,6 +2194,7 @@ def page_gestion_410_411():
         if st.session_state.df_410 is not None and st.session_state.df_411 is not None:
             st.markdown("### Analyses comparatives")
             
+            # Statistiques globales
             col1, col2 = st.columns(2)
             
             with col1:
@@ -2458,6 +2217,7 @@ def page_gestion_410_411():
                 if len(numeric_cols_411) > 0:
                     st.metric("Total montants", f"{df_411[numeric_cols_411[0]].sum():,.0f} FCFA")
             
+            # Graphique comparatif
             if 'No Police' in df_410.columns and 'No Police' in df_411.columns:
                 polices_410 = set(df_410['No Police'].dropna())
                 polices_411 = set(df_411['No Police'].dropna())
@@ -2486,8 +2246,7 @@ def page_gestion_410_411():
                 fig.update_layout(
                     title="Comparaison des polices",
                     barmode='group',
-                    height=400,
-                    template='plotly_dark' if st.session_state.get('theme') == 'dark' else 'plotly_white'
+                    height=400
                 )
                 
                 st.plotly_chart(fig, use_container_width=True)
@@ -2495,10 +2254,12 @@ def page_gestion_410_411():
             st.info("Importez les fichiers pour voir les analyses.")
 
 def page_gestion_doublons():
+    """Page de gestion des doublons"""
     update_last_activity()
     
     st.markdown("## 🔍 Gestion des Doublons")
     
+    # Upload du fichier
     uploaded_file = st.file_uploader(
         "Importer un fichier de polices",
         type=['xlsx', 'xls', 'csv'],
@@ -2515,9 +2276,11 @@ def page_gestion_doublons():
                 
                 st.success(f"Fichier chargé: {len(df)} enregistrements")
                 
+                # Détection des doublons
                 duplicates_df, uniques_df, stats = detect_duplicates(df)
                 
                 if isinstance(stats, dict):
+                    # Métriques
                     col1, col2, col3, col4 = st.columns(4)
                     
                     with col1:
@@ -2551,12 +2314,14 @@ def page_gestion_doublons():
                             "Nombre de polices apparaissant plusieurs fois"
                         )
                     
+                    # Tabs
                     tab1, tab2 = st.tabs(["🔄 Polices en doublon", "✅ Polices uniques"])
                     
                     with tab1:
                         if duplicates_df is not None and not duplicates_df.empty:
                             st.markdown(f"### {len(duplicates_df)} enregistrements en doublon")
                             
+                            # Recherche
                             search = create_search_bar("dup_search", "Rechercher...")
                             
                             df_display = duplicates_df.copy()
@@ -2565,6 +2330,7 @@ def page_gestion_doublons():
                             
                             st.dataframe(df_display, use_container_width=True, height=500, hide_index=True)
                             
+                            # Export
                             if st.button("📥 Exporter les doublons", use_container_width=True):
                                 output = export_to_excel(
                                     [duplicates_df],
@@ -2584,6 +2350,7 @@ def page_gestion_doublons():
                         if uniques_df is not None and not uniques_df.empty:
                             st.markdown(f"### {len(uniques_df)} polices uniques")
                             
+                            # Recherche
                             search = create_search_bar("unique_search", "Rechercher...")
                             
                             df_display = uniques_df.copy()
@@ -2592,6 +2359,7 @@ def page_gestion_doublons():
                             
                             st.dataframe(df_display, use_container_width=True, height=500, hide_index=True)
                             
+                            # Export
                             if st.button("📥 Exporter les polices uniques", use_container_width=True):
                                 output = export_to_excel(
                                     [uniques_df],
@@ -2607,11 +2375,13 @@ def page_gestion_doublons():
                         else:
                             st.info("Aucune police unique trouvée")
                     
+                    # Visualisation
                     st.markdown("### 📊 Visualisation")
                     
                     col1, col2 = st.columns(2)
                     
                     with col1:
+                        # Camembert
                         fig = go.Figure(data=[
                             go.Pie(
                                 labels=['Polices uniques', 'Polices en doublon'],
@@ -2620,14 +2390,11 @@ def page_gestion_doublons():
                                 hole=0.3
                             )
                         ])
-                        fig.update_layout(
-                            title="Répartition des polices",
-                            height=400,
-                            template='plotly_dark' if st.session_state.get('theme') == 'dark' else 'plotly_white'
-                        )
+                        fig.update_layout(title="Répartition des polices", height=400)
                         st.plotly_chart(fig, use_container_width=True)
                     
                     with col2:
+                        # Histogramme des occurrences
                         police_col = None
                         for col in df.columns:
                             if 'police' in col.lower() or 'num' in col.lower():
@@ -2642,12 +2409,9 @@ def page_gestion_doublons():
                                 y=occurrences.values,
                                 title="Distribution des occurrences",
                                 labels={'x': "Nombre d'occurrences", 'y': 'Nombre de polices'},
-                                color_discrete_sequence=[get_theme_colors()['primary']]
+                                color_discrete_sequence=['#1e3c72']
                             )
-                            fig.update_layout(
-                                height=400,
-                                template='plotly_dark' if st.session_state.get('theme') == 'dark' else 'plotly_white'
-                            )
+                            fig.update_layout(height=400)
                             st.plotly_chart(fig, use_container_width=True)
                     
                     log_action("Analyse doublons", f"{stats['duplicate_polices']} polices dupliquées")
@@ -2659,10 +2423,12 @@ def page_gestion_doublons():
                 st.error(f"Erreur lors du traitement: {str(e)}")
 
 def page_gestion_production():
+    """Page de gestion de production (certificats)"""
     update_last_activity()
     
     st.markdown("## 📄 Générateur de Certificats")
     
+    # Onglets
     tab1, tab2, tab3 = st.tabs(["📥 Import", "🎨 Personnalisation", "🚀 Génération"])
     
     with tab1:
@@ -2681,6 +2447,7 @@ def page_gestion_production():
                 st.success("Modèle chargé avec succès")
                 st.session_state.template = template_file
                 
+                # Aperçu du modèle
                 st.markdown("#### Informations")
                 st.info(f"Nom: {template_file.name}\nTaille: {template_file.size / 1024:.1f} KB")
         
@@ -2737,14 +2504,14 @@ def page_gestion_production():
                     f"""
                     <div style="font-family: {police}; font-size: {taille}px; color: {couleur}; 
                          text-align: {'left' if alignement == 'Gauche' else 'center' if alignement == 'Centré' else 'right'};
-                         padding: 20px; border: 1px solid var(--border-color); border-radius: 5px;
-                         background: var(--card-bg);">
+                         padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
                         Texte d'exemple
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
             
+            # Sauvegarde des préférences
             if st.button("💾 Sauvegarder les préférences", use_container_width=True):
                 st.session_state.user_preferences.update({
                     'certificat_police': police,
@@ -2764,6 +2531,7 @@ def page_gestion_production():
             
             st.markdown(f"**{len(df)} certificats à générer**")
             
+            # Options de génération
             col1, col2 = st.columns(2)
             
             with col1:
@@ -2780,6 +2548,7 @@ def page_gestion_production():
                     help="Préfixe pour les noms de fichiers"
                 )
             
+            # Simulation de progression
             if st.button("🚀 Lancer la génération", type="primary", use_container_width=True):
                 progress_bar = st.progress(0)
                 status_text = st.empty()
@@ -2787,8 +2556,10 @@ def page_gestion_production():
                 total = len(df)
                 
                 for i in range(total):
+                    # Simulation
                     time.sleep(0.05)
                     
+                    # Mise à jour de la progression
                     progress = (i + 1) / total
                     progress_bar.progress(progress)
                     status_text.text(f"Génération: {i+1}/{total} certificats")
@@ -2801,6 +2572,7 @@ def page_gestion_production():
                 
                 st.balloons()
                 
+                # Statistiques
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     st.metric("Certificats générés", total)
@@ -2810,6 +2582,7 @@ def page_gestion_production():
                     taille_estimée = total * 50
                     st.metric("Taille estimée", f"{taille_estimée / 1024:.1f} MB")
                 
+                # Bouton de téléchargement simulé
                 st.download_button(
                     label="📥 Télécharger tous les certificats (ZIP)",
                     data=b"Simulation de fichier ZIP",
@@ -2823,15 +2596,18 @@ def page_gestion_production():
             st.info("Veuillez d'abord importer un modèle et des données dans l'onglet Import.")
 
 def page_statistiques():
+    """Page de statistiques"""
     update_last_activity()
     
     st.markdown("## 📈 Statistiques et Analyses")
     
+    # Onglets
     tab1, tab2, tab3, tab4 = st.tabs(["📊 Vue d'ensemble", "📈 Tendances", "📋 Rapports", "📥 Export"])
     
     with tab1:
         st.markdown("### Vue d'ensemble du système")
         
+        # Métriques globales
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -2862,6 +2638,7 @@ def page_statistiques():
                 help="Nombre total de certificats générés"
             )
         
+        # État des données
         st.markdown("### État des données")
         
         col1, col2 = st.columns(2)
@@ -2894,6 +2671,7 @@ def page_statistiques():
             else:
                 st.info("Aucune donnée comptable")
         
+        # Dernières activités
         st.markdown("### Dernières activités")
         
         if st.session_state.logs:
@@ -2910,6 +2688,7 @@ def page_statistiques():
     with tab2:
         st.markdown("### Tendances et évolutions")
         
+        # Simulation de données de tendance
         dates = pd.date_range(end=datetime.now(), periods=30, freq='D')
         
         np.random.seed(42)
@@ -2922,6 +2701,7 @@ def page_statistiques():
             'Vérifications': verifications_data
         })
         
+        # Graphique des tendances
         fig = go.Figure()
         
         fig.add_trace(go.Scatter(
@@ -2947,12 +2727,12 @@ def page_statistiques():
             xaxis_title="Date",
             yaxis_title="Nombre d'opérations",
             height=500,
-            hovermode='x unified',
-            template='plotly_dark' if st.session_state.get('theme') == 'dark' else 'plotly_white'
+            hovermode='x unified'
         )
         
         st.plotly_chart(fig, use_container_width=True)
         
+        # Statistiques par jour
         st.markdown("### Statistiques journalières")
         
         col1, col2, col3 = st.columns(3)
@@ -2995,6 +2775,7 @@ def page_statistiques():
                 
                 st.success("Rapport généré avec succès!")
                 
+                # Simulation de téléchargement
                 st.download_button(
                     label="📥 Télécharger le rapport",
                     data=b"Simulation de rapport",
@@ -3008,6 +2789,7 @@ def page_statistiques():
     with tab4:
         st.markdown("### Export des données")
         
+        # Export complet
         st.markdown("#### Export complet de la base")
         
         if st.button("📦 Exporter toutes les données", use_container_width=True):
@@ -3041,6 +2823,7 @@ def page_statistiques():
             else:
                 st.warning("Aucune donnée à exporter")
         
+        # Export des logs
         st.markdown("#### Export des logs")
         
         if st.session_state.logs:
@@ -3071,14 +2854,17 @@ def page_statistiques():
             st.info("Aucun log à exporter")
 
 def page_administration():
+    """Page d'administration"""
     update_last_activity()
     
+    # Vérification des droits
     if st.session_state.role != "admin":
         st.error("⛔ Accès réservé aux administrateurs")
         return
     
     st.markdown("## ⚙️ Administration")
     
+    # Onglets
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "👥 Utilisateurs", "📋 Logs", "📜 Historique", 
         "💾 Sauvegardes", "🔧 Paramètres"
@@ -3087,12 +2873,14 @@ def page_administration():
     with tab1:
         st.markdown("### Gestion des utilisateurs")
         
+        # Liste des utilisateurs
         users = get_all_users()
         
         if users:
             users_df = pd.DataFrame(users)
             st.dataframe(users_df, use_container_width=True, hide_index=True)
         
+        # Formulaire d'ajout
         with st.expander("➕ Ajouter un utilisateur"):
             with st.form("add_user_form"):
                 col1, col2 = st.columns(2)
@@ -3116,6 +2904,7 @@ def page_administration():
                     else:
                         st.warning("Veuillez remplir tous les champs obligatoires")
         
+        # Modification / Suppression
         if users:
             with st.expander("✏️ Modifier un utilisateur"):
                 selected_user = st.selectbox(
@@ -3182,6 +2971,7 @@ def page_administration():
         if st.session_state.logs:
             logs_df = pd.DataFrame(st.session_state.logs)
             
+            # Filtres
             col1, col2, col3 = st.columns(3)
             
             with col1:
@@ -3199,6 +2989,7 @@ def page_administration():
                     levels_filter = ["Tous"] + list(logs_df['level'].unique())
                     selected_level = st.selectbox("Niveau", levels_filter)
             
+            # Application des filtres
             filtered_logs = logs_df.copy()
             
             if selected_user != "Tous":
@@ -3210,8 +3001,10 @@ def page_administration():
             if selected_level != "Tous":
                 filtered_logs = filtered_logs[filtered_logs['level'] == selected_level]
             
+            # Affichage
             st.dataframe(filtered_logs, use_container_width=True, height=500, hide_index=True)
             
+            # Export
             col1, col2 = st.columns(2)
             
             with col1:
@@ -3239,6 +3032,7 @@ def page_administration():
         if st.session_state.history:
             history_df = pd.DataFrame(st.session_state.history)
             
+            # Filtre par utilisateur
             if 'username' in history_df.columns:
                 users_filter = ["Tous"] + list(history_df['username'].unique())
                 selected_user_hist = st.selectbox("Filtrer par utilisateur", users_filter, key="hist_user")
@@ -3248,6 +3042,7 @@ def page_administration():
             
             st.dataframe(history_df, use_container_width=True, height=500, hide_index=True)
             
+            # Export
             if st.button("📥 Exporter l'historique", use_container_width=True):
                 output = export_to_excel([history_df], ["Historique"], "historique_actions.xlsx")
                 if output:
@@ -3267,8 +3062,10 @@ def page_administration():
         with col1:
             if st.button("💾 Créer une sauvegarde", use_container_width=True):
                 with st.spinner("Création de la sauvegarde..."):
+                    # Créer un dossier backups si nécessaire
                     os.makedirs("backups", exist_ok=True)
                     
+                    # Créer une sauvegarde simple
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     backup_file = f"backups/backup_{timestamp}.db"
                     
@@ -3280,6 +3077,7 @@ def page_administration():
                         st.error("Fichier de base de données introuvable")
         
         with col2:
+            # Liste des sauvegardes
             backup_dir = "backups"
             if os.path.exists(backup_dir):
                 backups = [f for f in os.listdir(backup_dir) if f.startswith("backup_") and f.endswith(".db")]
@@ -3298,6 +3096,7 @@ def page_administration():
                                 else:
                                     st.error("Fichier de sauvegarde introuvable")
         
+        # Configuration des sauvegardes
         st.markdown("### Configuration des sauvegardes")
         
         col1, col2 = st.columns(2)
@@ -3391,27 +3190,31 @@ def page_administration():
 
 # ======================== BARRE LATÉRALE ========================
 def sidebar():
+    """Affiche la barre latérale"""
     with st.sidebar:
+        # En-tête
         st.markdown("""
         <div style="text-align: center; padding: 20px 10px;">
-            <h2 style="margin-bottom: 5px;">AGC-VIE</h2>
-            <p style="opacity: 0.7; font-size: 0.9em;">Version 2.0</p>
+            <h2 style="color: #1e3c72; margin-bottom: 5px;">AGC-VIE</h2>
+            <p style="color: #666; font-size: 0.9em;">Version 2.0</p>
         </div>
         """, unsafe_allow_html=True)
         
+        # Informations utilisateur
         if st.session_state.authenticated:
             st.markdown(f"""
             <div style="background: rgba(30, 60, 114, 0.1); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                <p style="margin: 0; font-size: 1.1em;">👤 {st.session_state.username}</p>
+                <p style="color: #1e3c72; margin: 0; font-size: 1.1em;">👤 {st.session_state.username}</p>
                 <p style="color: #28a745; margin: 5px 0 0 0; font-size: 0.9em;">
                     {'👑 Administrateur' if st.session_state.role == 'admin' else '👤 Utilisateur'}
                 </p>
-                <p style="opacity: 0.6; margin: 5px 0 0 0; font-size: 0.8em;">
+                <p style="color: #999; margin: 5px 0 0 0; font-size: 0.8em;">
                     {datetime.now().strftime('%d/%m/%Y %H:%M')}
                 </p>
             </div>
             """, unsafe_allow_html=True)
         
+        # Menu de navigation
         menu_options = {
             "Accueil": "🏠",
             "Gestion Technique": "📊",
@@ -3426,6 +3229,7 @@ def sidebar():
             "Déconnexion": "🚪"
         }
         
+        # Filtrer les options
         filtered_options = {k: v for k, v in menu_options.items() if v is not None}
         
         selected = st.radio(
@@ -3436,9 +3240,10 @@ def sidebar():
             label_visibility="collapsed"
         )
         
+        # Pied de page
         st.markdown("---")
         st.markdown("""
-        <div style="text-align: center; opacity: 0.6; font-size: 0.8em; padding: 10px;">
+        <div style="text-align: center; color: #999; font-size: 0.8em; padding: 10px;">
             <p>© 2025 AGC-VIE</p>
             <p>Version 2.0</p>
         </div>
@@ -3450,8 +3255,8 @@ def sidebar():
 def main():
     """Fonction principale de l'application"""
     
-    # Appliquer le thème
-    apply_theme_css()
+    # Appliquer les styles CSS
+    apply_custom_css()
     
     # Vérification du timeout de session
     if st.session_state.authenticated:
@@ -3465,9 +3270,6 @@ def main():
     
     # Menu latéral
     selected = sidebar()
-    
-    # Sélecteur de thème
-    theme_selector()
     
     # Mise à jour de la page courante
     st.session_state.page = selected
@@ -3498,8 +3300,10 @@ def main():
 
 # ======================== POINT D'ENTRÉE ========================
 if __name__ == "__main__":
+    # Initialisation de la session
     init_session_state()
     
+    # Exécution de l'application
     try:
         main()
     except Exception as e:
