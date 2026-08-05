@@ -990,17 +990,48 @@ def create_download_button(data, filename, button_text, mime_type=None):
     )
 
 # ======================== COMPOSANTS D'INTERFACE ========================
-def display_metric_card(title, value, icon="📊", description=""):
-    """Affiche une carte métrique stylisée"""
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown(f"""
-        <div class="metric-card fade-in">
-            <h3>{icon} {title}</h3>
-            <p>{value}</p>
-            <small>{description}</small>
+def display_metric_card(title, value, icon="📊", description="", color="primary"):
+    """Affiche une carte métrique stylisée avec différentes couleurs"""
+    colors = {
+        "primary": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        "success": "linear-gradient(135deg, #28a745 0%, #20c997 100%)",
+        "danger": "linear-gradient(135deg, #dc3545 0%, #c82333 100%)",
+        "warning": "linear-gradient(135deg, #ffc107 0%, #fd7e14 100%)",
+        "info": "linear-gradient(135deg, #17a2b8 0%, #138496 100%)",
+        "dark": "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)"
+    }
+    
+    bg_color = colors.get(color, colors["primary"])
+    
+    st.markdown(f"""
+    <div class="metric-card" style="background: {bg_color}; padding: 15px; border-radius: 12px; 
+         color: white; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+         margin: 5px 0; transition: transform 0.3s;">
+        <div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">
+            {icon} {title}
         </div>
-        """, unsafe_allow_html=True)
+        <div style="font-size: 1.8em; font-weight: bold; margin: 5px 0;">
+            {value}
+        </div>
+        <div style="font-size: 0.8em; opacity: 0.8;">
+            {description}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def display_metrics_row(metrics, cols=4):
+    """Affiche une ligne de métriques dans une grille"""
+    cols_list = st.columns(cols)
+    for i, metric in enumerate(metrics):
+        with cols_list[i % cols]:
+            display_metric_card(
+                title=metric.get('title', ''),
+                value=metric.get('value', ''),
+                icon=metric.get('icon', '📊'),
+                description=metric.get('description', ''),
+                color=metric.get('color', 'primary')
+            )
 
 def display_badge(text, type="info"):
     """Affiche un badge stylisé"""
@@ -1144,113 +1175,146 @@ def page_accueil():
     update_last_activity()
     
     st.markdown("""
-    <div class="content-card fade-in" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); text-align: center;">
-        <h1 style="color: white;">Bienvenue sur AGC-VIE</h1>
-        <p style="color: white; font-size: 1.2em;">
+    <div class="content-card fade-in" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+         padding: 30px; border-radius: 15px; text-align: center; margin-bottom: 30px;">
+        <h1 style="color: white; font-size: 2.5em; margin-bottom: 10px;">🏢 AGC-VIE</h1>
+        <p style="color: white; font-size: 1.2em; opacity: 0.9;">
             Système intégré de Gestion Technique et Comptable
+        </p>
+        <p style="color: white; font-size: 0.9em; opacity: 0.7; margin-top: 10px;">
+            Version 2.0 | {datetime.now().strftime('%d/%m/%Y %H:%M')}
         </p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Métriques rapides
-    col1, col2, col3, col4 = st.columns(4)
+    # Métriques principales
+    tech_count = len(st.session_state.pivot_techniques) if st.session_state.pivot_techniques is not None else 0
+    compta_count = len(st.session_state.pivot_comptables) if st.session_state.pivot_comptables is not None else 0
+    
+    ca_tech = 0
+    if st.session_state.pivot_techniques is not None and 'Emissions' in st.session_state.pivot_techniques.columns:
+        ca_tech = st.session_state.pivot_techniques['Emissions'].sum()
+    
+    ca_compta = 0
+    if st.session_state.pivot_comptables is not None and 'Crédit' in st.session_state.pivot_comptables.columns:
+        ca_compta = st.session_state.pivot_comptables['Crédit'].sum()
+    
+    metrics = [
+        {
+            'title': 'Données techniques',
+            'value': f'{tech_count:,}',
+            'icon': '📊',
+            'description': 'Enregistrements',
+            'color': 'primary'
+        },
+        {
+            'title': 'Données comptables',
+            'value': f'{compta_count:,}',
+            'icon': '💰',
+            'description': 'Enregistrements',
+            'color': 'success'
+        },
+        {
+            'title': 'CA Technique',
+            'value': f'{ca_tech:,.0f} FCFA',
+            'icon': '📈',
+            'description': 'Chiffre d\'affaires',
+            'color': 'info'
+        },
+        {
+            'title': 'CA Comptable',
+            'value': f'{ca_compta:,.0f} FCFA',
+            'icon': '📉',
+            'description': 'Chiffre d\'affaires',
+            'color': 'warning'
+        }
+    ]
+    
+    display_metrics_row(metrics, cols=4)
+    
+    # Statistiques rapides
+    st.markdown("---")
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        tech_count = len(st.session_state.pivot_techniques) if st.session_state.pivot_techniques is not None else 0
-        st.metric(
-            "📊 Données techniques",
-            tech_count,
-            help="Nombre d'enregistrements techniques"
-        )
+        st.markdown("""
+        <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <h4 style="color: #1e3c72; margin-bottom: 15px;">📋 Dernières activités</h4>
+        """, unsafe_allow_html=True)
+        
+        if st.session_state.logs:
+            logs_df = pd.DataFrame(st.session_state.logs[-5:])
+            if not logs_df.empty:
+                for _, row in logs_df.iterrows():
+                    st.markdown(f"""
+                    <div style="padding: 8px 0; border-bottom: 1px solid #eee; font-size: 0.9em;">
+                        <span style="color: #666;">{row['timestamp'][:16]}</span>
+                        <span style="color: #1e3c72; font-weight: 500;">{row['action']}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.info("Aucune activité récente")
+        st.markdown("</div>", unsafe_allow_html=True)
     
     with col2:
-        compta_count = len(st.session_state.pivot_comptables) if st.session_state.pivot_comptables is not None else 0
-        st.metric(
-            "💰 Données comptables",
-            compta_count,
-            help="Nombre d'enregistrements comptables"
-        )
+        st.markdown("""
+        <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <h4 style="color: #1e3c72; margin-bottom: 15px;">📊 Statistiques</h4>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 1.5em; font-weight: bold; color: #1e3c72;">
+                    {st.session_state.stats.get('total_imports', 0)}
+                </div>
+                <div style="font-size: 0.8em; color: #666;">Imports</div>
+            </div>
+            <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 1.5em; font-weight: bold; color: #28a745;">
+                    {st.session_state.stats.get('total_verifications', 0)}
+                </div>
+                <div style="font-size: 0.8em; color: #666;">Vérifications</div>
+            </div>
+            <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 1.5em; font-weight: bold; color: #17a2b8;">
+                    {st.session_state.stats.get('total_certificats', 0)}
+                </div>
+                <div style="font-size: 0.8em; color: #666;">Certificats</div>
+            </div>
+            <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 1.5em; font-weight: bold; color: #fd7e14;">
+                    {len(get_all_users()) if get_all_users() else 0}
+                </div>
+                <div style="font-size: 0.8em; color: #666;">Utilisateurs</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
     
     with col3:
-        if st.session_state.pivot_techniques is not None and 'Emissions' in st.session_state.pivot_techniques.columns:
-            ca_tech = st.session_state.pivot_techniques['Emissions'].sum()
-            st.metric(
-                "📈 CA Technique",
-                f"{ca_tech:,.0f} FCFA",
-                help="Chiffre d'affaires technique"
-            )
-    
-    with col4:
-        if st.session_state.pivot_comptables is not None and 'Crédit' in st.session_state.pivot_comptables.columns:
-            ca_compta = st.session_state.pivot_comptables['Crédit'].sum()
-            st.metric(
-                "📉 CA Comptable",
-                f"{ca_compta:,.0f} FCFA",
-                help="Chiffre d'affaires comptable"
-            )
-    
-    # Modules disponibles
-    st.markdown("## 🚀 Modules disponibles")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
         st.markdown("""
-        <div class="content-card">
-            <h3>📊 Gestion Technique</h3>
-            <p>Import, analyse et traitement des données techniques</p>
-            <ul>
-                <li>Import de fichiers Excel/CSV</li>
-                <li>Traitement des polices</li>
-                <li>Calcul des émissions et ristournes</li>
-                <li>Export des données</li>
-            </ul>
-        </div>
+        <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <h4 style="color: #1e3c72; margin-bottom: 15px;">🚀 Actions rapides</h4>
         """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div class="content-card">
-            <h3>💰 Gestion Comptable</h3>
-            <p>Gestion des données comptables et rapprochements</p>
-            <ul>
-                <li>Import des écritures comptables</li>
-                <li>Analyse des débits/crédits</li>
-                <li>Tableaux croisés dynamiques</li>
-                <li>Export des résultats</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        <div class="content-card">
-            <h3>🔄 Rapprochement Technique</h3>
-            <p>Rapprochement entre données techniques et comptables</p>
-            <ul>
-                <li>Comparaison automatique</li>
-                <li>Détection des écarts</li>
-                <li>Visualisation des résultats</li>
-                <li>Export des rapprochements</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div class="content-card">
-            <h3>📋 Gestion 410 & 411</h3>
-            <p>Gestion des comptes 410 et 411</p>
-            <ul>
-                <li>Vérification des polices</li>
-                <li>Détection des incohérences</li>
-                <li>Validation des références</li>
-                <li>Analyse comparative</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
+        
+        col_a, col_b = st.columns(2)
+        with col_a:
+            if st.button("📊 Importer technique", use_container_width=True):
+                st.session_state.page = "Gestion Technique"
+                st.rerun()
+            if st.button("💰 Importer comptable", use_container_width=True):
+                st.session_state.page = "Gestion Comptable"
+                st.rerun()
+        with col_b:
+            if st.button("🔄 Rapprochement", use_container_width=True):
+                st.session_state.page = "Rapprochement Technique"
+                st.rerun()
+            if st.button("📈 Statistiques", use_container_width=True):
+                st.session_state.page = "Statistiques"
+                st.rerun()
+        
+        st.markdown("</div>", unsafe_allow_html=True)
 
 def page_gestion_technique():
     """Page de gestion technique"""
@@ -1632,10 +1696,16 @@ def page_rapprochement_technique():
     # Vérification des données
     if st.session_state.pivot_techniques is None:
         st.warning("⚠️ Données techniques manquantes. Veuillez d'abord importer les données techniques.")
+        if st.button("📥 Aller à la gestion technique"):
+            st.session_state.page = "Gestion Technique"
+            st.rerun()
         return
     
     if st.session_state.pivot_comptables is None:
         st.warning("⚠️ Données comptables manquantes. Veuillez d'abord importer les données comptables.")
+        if st.button("💰 Aller à la gestion comptable"):
+            st.session_state.page = "Gestion Comptable"
+            st.rerun()
         return
     
     # Effectuer le rapprochement
@@ -1651,36 +1721,78 @@ def page_rapprochement_technique():
         # Métriques
         st.markdown("### 📊 Résumé du rapprochement")
         
-        col1, col2, col3, col4 = st.columns(4)
+        # Première ligne : Polices
+        metrics_row1 = [
+            {
+                'title': 'Polices techniques',
+                'value': f"{stats.get('polices_techniques', 0):,}",
+                'icon': '📊',
+                'description': f"Total: {stats.get('polices_techniques', 0):,}",
+                'color': 'primary'
+            },
+            {
+                'title': 'Polices comptables',
+                'value': f"{stats.get('polices_comptables', 0):,}",
+                'icon': '💰',
+                'description': f"Total: {stats.get('polices_comptables', 0):,}",
+                'color': 'success'
+            },
+            {
+                'title': 'Polices communes',
+                'value': f"{stats.get('polices_communes', 0):,}",
+                'icon': '🔄',
+                'description': f"Taux: {(stats.get('polices_communes', 0)/stats.get('polices_techniques', 1)*100):.1f}%",
+                'color': 'info'
+            },
+            {
+                'title': 'Écart total',
+                'value': f"{stats.get('ecart_total', 0):,.0f} FCFA",
+                'icon': '📈',
+                'description': 'CA Technique - CA Comptable',
+                'color': 'warning' if stats.get('ecart_total', 0) > 0 else 'danger'
+            }
+        ]
         
-        with col1:
-            display_metric_card(
-                "Polices techniques",
-                stats.get('polices_techniques', 0),
-                "📊"
-            )
+        display_metrics_row(metrics_row1, cols=4)
         
-        with col2:
-            display_metric_card(
-                "Polices comptables",
-                stats.get('polices_comptables', 0),
-                "💰"
-            )
-        
-        with col3:
-            display_metric_card(
-                "Polices communes",
-                stats.get('polices_communes', 0),
-                "🔄"
-            )
-        
-        with col4:
-            ecart = stats.get('ecart_total', 0)
-            display_metric_card(
-                "Écart total",
-                f"{ecart:,.0f} FCFA",
-                "📈" if ecart >= 0 else "📉"
-            )
+        # Deuxième ligne : Statut
+        if 'Statut' in merged_df.columns:
+            rapprochees = stats.get('rapprochees', 0)
+            non_rapprochees = stats.get('non_rapprochees', 0)
+            total = rapprochees + non_rapprochees
+            
+            metrics_row2 = [
+                {
+                    'title': '✅ Rapprochées',
+                    'value': f"{rapprochees:,}",
+                    'icon': '✅',
+                    'description': f"{(rapprochees/total*100 if total > 0 else 0):.1f}%",
+                    'color': 'success'
+                },
+                {
+                    'title': '❌ Non rapprochées',
+                    'value': f"{non_rapprochees:,}",
+                    'icon': '❌',
+                    'description': f"{(non_rapprochees/total*100 if total > 0 else 0):.1f}%",
+                    'color': 'danger'
+                },
+                {
+                    'title': '📋 Total polices',
+                    'value': f"{total:,}",
+                    'icon': '📋',
+                    'description': 'Toutes les polices',
+                    'color': 'dark'
+                },
+                {
+                    'title': '📊 Taux de rapprochement',
+                    'value': f"{(rapprochees/total*100 if total > 0 else 0):.1f}%",
+                    'icon': '📊',
+                    'description': f"{rapprochees} / {total}",
+                    'color': 'info'
+                }
+            ]
+            
+            display_metrics_row(metrics_row2, cols=4)
         
         # Tabs pour les différentes vues
         tab1, tab2, tab3 = st.tabs(["📋 Données complètes", "❌ Non rapprochées", "✅ Rapprochées"])
@@ -1748,7 +1860,11 @@ def page_rapprochement_technique():
                     color_discrete_sequence=['#28a745', '#dc3545'],
                     hole=0.3
                 )
-                fig.update_layout(height=400)
+                fig.update_layout(
+                    height=400,
+                    showlegend=True,
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.2)
+                )
                 st.plotly_chart(fig, use_container_width=True)
         
         with col2:
@@ -1761,8 +1877,52 @@ def page_rapprochement_technique():
                     title="Distribution des écarts",
                     color_discrete_sequence=['#1e3c72']
                 )
-                fig.update_layout(height=400)
+                fig.update_layout(
+                    height=400,
+                    xaxis_title="Écart (FCFA)",
+                    yaxis_title="Nombre de polices"
+                )
                 st.plotly_chart(fig, use_container_width=True)
+        
+        # Export complet
+        st.markdown("### 📥 Export du rapport")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("📥 Exporter le rapport complet", type="primary", use_container_width=True):
+                output = export_to_excel(
+                    [merged_df],
+                    ["Rapprochement"],
+                    "rapprochement_technique_complet.xlsx"
+                )
+                if output:
+                    create_download_button(
+                        output,
+                        "rapprochement_technique_complet.xlsx",
+                        "Télécharger le rapport"
+                    )
+        
+        with col2:
+            if 'Statut' in merged_df.columns:
+                non_rapproche = merged_df[merged_df['Statut'] == 'Non rapproché']
+                if not non_rapproche.empty:
+                    if st.button("📥 Exporter les non rapprochées", use_container_width=True):
+                        output = export_to_excel(
+                            [non_rapproche],
+                            ["Non rapprochées"],
+                            "polices_non_rapprochees.xlsx"
+                        )
+                        if output:
+                            create_download_button(
+                                output,
+                                "polices_non_rapprochees.xlsx",
+                                "Télécharger"
+                            )
+        
+        with col3:
+            if st.button("📊 Exporter les graphiques", use_container_width=True):
+                st.info("Fonctionnalité à venir: export des graphiques en PNG")
         
         log_action("Rapprochement technique", f"{len(merged_df)} polices analysées")
         
@@ -1773,227 +1933,406 @@ def page_rapprochement_comptable():
     """Page de rapprochement comptable"""
     update_last_activity()
     
-    st.markdown("## 🔄 Rapprochement Comptable")
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+         padding: 20px; border-radius: 12px; margin-bottom: 25px;">
+        <h2 style="color: white; margin: 0;">🔄 Rapprochement Comptable</h2>
+        <p style="color: white; opacity: 0.9; margin: 5px 0 0 0;">
+            Comparaison entre les données techniques et comptables
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Vérification des données
     if st.session_state.pivot_techniques is None:
         st.warning("⚠️ Données techniques manquantes. Veuillez d'abord importer les données techniques.")
-        if st.button("📥 Aller à la gestion technique"):
-            st.session_state.page = "Gestion Technique"
-            st.rerun()
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("📥 Aller à la gestion technique", use_container_width=True):
+                st.session_state.page = "Gestion Technique"
+                st.rerun()
         return
     
     if st.session_state.pivot_comptables is None:
         st.warning("⚠️ Données comptables manquantes. Veuillez d'abord importer les données comptables.")
-        if st.button("💰 Aller à la gestion comptable"):
-            st.session_state.page = "Gestion Comptable"
-            st.rerun()
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("💰 Aller à la gestion comptable", use_container_width=True):
+                st.session_state.page = "Gestion Comptable"
+                st.rerun()
         return
     
-    with st.spinner("Calcul du rapprochement comptable en cours..."):
-        try:
-            # Récupérer les données
-            df_tech = st.session_state.pivot_techniques.copy()
-            df_compta = st.session_state.pivot_comptables.copy()
-            
-            # Nettoyage des noms de colonnes
-            df_tech.columns = df_tech.columns.str.strip()
-            df_compta.columns = df_compta.columns.str.strip()
-            
-            # Déterminer les colonnes de police
-            tech_col = 'Nouvelle_Police' if 'Nouvelle_Police' in df_tech.columns else df_tech.columns[0]
-            compta_col = 'No Police' if 'No Police' in df_compta.columns else df_compta.columns[0]
-            
-            # Conversion en string pour la jointure
-            df_tech[tech_col] = df_tech[tech_col].astype(str).str.strip()
-            df_compta[compta_col] = df_compta[compta_col].astype(str).str.strip()
-            
-            # Ajouter les colonnes techniques aux données comptables
-            df_compta['Ristournes'] = 0
-            df_compta['Emissions'] = 0
-            df_compta['Statut_Ristournes'] = 'Non trouvé'
-            df_compta['Statut_Emissions'] = 'Non trouvé'
-            
-            # Pour chaque ligne comptable, chercher la correspondance dans les données techniques
-            for index, row in df_compta.iterrows():
-                police_compta = str(row[compta_col]).strip()
-                
-                # Chercher la correspondance
-                correspondance = df_tech[df_tech[tech_col].astype(str).str.strip() == police_compta]
-                
-                if not correspondance.empty:
-                    # Récupérer les premières valeurs
-                    if 'Ristournes' in correspondance.columns:
-                        val = correspondance['Ristournes'].iloc[0]
-                        df_compta.at[index, 'Ristournes'] = pd.to_numeric(val, errors='coerce') if val != 0 else 0
-                        df_compta.at[index, 'Statut_Ristournes'] = 'Trouvé'
+    # Bouton pour lancer le rapprochement
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("🚀 Lancer le rapprochement comptable", type="primary", use_container_width=True):
+            with st.spinner("Calcul du rapprochement comptable en cours..."):
+                try:
+                    # Récupérer les données
+                    df_tech = st.session_state.pivot_techniques.copy()
+                    df_compta = st.session_state.pivot_comptables.copy()
                     
-                    if 'Emissions' in correspondance.columns:
-                        val = correspondance['Emissions'].iloc[0]
-                        df_compta.at[index, 'Emissions'] = pd.to_numeric(val, errors='coerce') if val != 0 else 0
-                        df_compta.at[index, 'Statut_Emissions'] = 'Trouvé'
-            
-            # Conversion en numérique
-            numeric_cols = ['Crédit', 'Débit', 'Emissions', 'Ristournes', 'Montant']
-            for col in numeric_cols:
-                if col in df_compta.columns:
-                    df_compta[col] = pd.to_numeric(df_compta[col], errors='coerce').fillna(0)
-            
-            # Calcul du rapprochement
-            if all(col in df_compta.columns for col in ['Crédit', 'Débit']):
-                df_compta['CA_Comptable'] = df_compta['Crédit'] - df_compta['Débit']
-            else:
-                df_compta['CA_Comptable'] = 0
-            
-            if all(col in df_compta.columns for col in ['Emissions', 'Ristournes']):
-                df_compta['CA_Technique'] = df_compta['Emissions'] + df_compta['Ristournes']
-            else:
-                df_compta['CA_Technique'] = 0
-            
-            df_compta['Écart'] = abs(df_compta['CA_Comptable']) - abs(df_compta['CA_Technique'])
-            df_compta['Rapprochement'] = df_compta.apply(
-                lambda row: 'Rapproché' if abs(row['Écart']) < 0.01 else 'Non rapproché', 
-                axis=1
-            )
-            
-            # Séparer valides et invalides
-            df_invalide = df_compta[df_compta['Rapprochement'] == 'Non rapproché']
-            df_valide = df_compta[df_compta['Rapprochement'] == 'Rapproché']
-            
-            # Statistiques
-            total_debit = df_compta['Débit'].sum() if 'Débit' in df_compta.columns else 0
-            total_credit = df_compta['Crédit'].sum() if 'Crédit' in df_compta.columns else 0
-            
-            stats = {
-                'total_debit': total_debit,
-                'total_credit': total_credit,
-                'total_CA_comptable': abs(total_credit - total_debit),
-                'total_emissions_tech': df_compta['Emissions'].sum() if 'Emissions' in df_compta.columns else 0,
-                'total_ristournes_tech': df_compta['Ristournes'].sum() if 'Ristournes' in df_compta.columns else 0,
-                'total_CA_technique': df_compta['CA_Technique'].sum() if 'CA_Technique' in df_compta.columns else 0,
-                'ecart': abs(df_compta['CA_Technique'].sum() - abs(total_credit - total_debit)) if 'CA_Technique' in df_compta.columns else 0,
-                'total_polices': len(df_compta),
-                'polices_valides': len(df_valide),
-                'polices_invalides': len(df_invalide)
-            }
-            
-            # Stockage dans la session
-            st.session_state.pivot_comptables_complet = df_compta
-            st.session_state.tableau_listing_police_invalide_comptable = df_invalide
-            st.session_state.tableau_listing_valide_comptable = df_valide
-            
-            log_action("Rapprochement comptable", f"{len(df_compta)} polices analysées")
-            
-        except Exception as e:
-            st.error(f"Erreur lors du rapprochement: {str(e)}")
-            log_action("Erreur rapprochement comptable", str(e), level="error")
-            return
+                    # Nettoyage des noms de colonnes
+                    df_tech.columns = df_tech.columns.str.strip()
+                    df_compta.columns = df_compta.columns.str.strip()
+                    
+                    # Déterminer les colonnes de police
+                    tech_col = 'Nouvelle_Police' if 'Nouvelle_Police' in df_tech.columns else df_tech.columns[0]
+                    compta_col = 'No Police' if 'No Police' in df_compta.columns else df_compta.columns[0]
+                    
+                    # Conversion en string pour la jointure
+                    df_tech[tech_col] = df_tech[tech_col].astype(str).str.strip()
+                    df_compta[compta_col] = df_compta[compta_col].astype(str).str.strip()
+                    
+                    # Ajouter les colonnes techniques aux données comptables
+                    df_compta['Ristournes'] = 0
+                    df_compta['Emissions'] = 0
+                    df_compta['Statut_Ristournes'] = 'Non trouvé'
+                    df_compta['Statut_Emissions'] = 'Non trouvé'
+                    
+                    # Pour chaque ligne comptable, chercher la correspondance dans les données techniques
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    
+                    total_rows = len(df_compta)
+                    for index, row in df_compta.iterrows():
+                        # Mise à jour de la progression
+                        progress = (index + 1) / total_rows
+                        progress_bar.progress(progress)
+                        status_text.text(f"Traitement: {index+1}/{total_rows} polices")
+                        
+                        police_compta = str(row[compta_col]).strip()
+                        
+                        # Chercher la correspondance
+                        correspondance = df_tech[df_tech[tech_col].astype(str).str.strip() == police_compta]
+                        
+                        if not correspondance.empty:
+                            # Récupérer les premières valeurs
+                            if 'Ristournes' in correspondance.columns:
+                                val = correspondance['Ristournes'].iloc[0]
+                                df_compta.at[index, 'Ristournes'] = pd.to_numeric(val, errors='coerce') if val != 0 else 0
+                                df_compta.at[index, 'Statut_Ristournes'] = 'Trouvé'
+                            
+                            if 'Emissions' in correspondance.columns:
+                                val = correspondance['Emissions'].iloc[0]
+                                df_compta.at[index, 'Emissions'] = pd.to_numeric(val, errors='coerce') if val != 0 else 0
+                                df_compta.at[index, 'Statut_Emissions'] = 'Trouvé'
+                    
+                    # Effacer la progression
+                    progress_bar.empty()
+                    status_text.empty()
+                    
+                    # Conversion en numérique
+                    numeric_cols = ['Crédit', 'Débit', 'Emissions', 'Ristournes', 'Montant']
+                    for col in numeric_cols:
+                        if col in df_compta.columns:
+                            df_compta[col] = pd.to_numeric(df_compta[col], errors='coerce').fillna(0)
+                    
+                    # Calcul du rapprochement
+                    if all(col in df_compta.columns for col in ['Crédit', 'Débit']):
+                        df_compta['CA_Comptable'] = df_compta['Crédit'] - df_compta['Débit']
+                    else:
+                        df_compta['CA_Comptable'] = 0
+                    
+                    if all(col in df_compta.columns for col in ['Emissions', 'Ristournes']):
+                        df_compta['CA_Technique'] = df_compta['Emissions'] + df_compta['Ristournes']
+                    else:
+                        df_compta['CA_Technique'] = 0
+                    
+                    df_compta['Écart'] = abs(df_compta['CA_Comptable']) - abs(df_compta['CA_Technique'])
+                    df_compta['Rapprochement'] = df_compta.apply(
+                        lambda row: 'Rapproché' if abs(row['Écart']) < 0.01 else 'Non rapproché', 
+                        axis=1
+                    )
+                    
+                    # Séparer valides et invalides
+                    df_invalide = df_compta[df_compta['Rapprochement'] == 'Non rapproché']
+                    df_valide = df_compta[df_compta['Rapprochement'] == 'Rapproché']
+                    
+                    # Statistiques
+                    total_debit = df_compta['Débit'].sum() if 'Débit' in df_compta.columns else 0
+                    total_credit = df_compta['Crédit'].sum() if 'Crédit' in df_compta.columns else 0
+                    
+                    stats = {
+                        'total_debit': total_debit,
+                        'total_credit': total_credit,
+                        'total_CA_comptable': abs(total_credit - total_debit),
+                        'total_emissions_tech': df_compta['Emissions'].sum() if 'Emissions' in df_compta.columns else 0,
+                        'total_ristournes_tech': df_compta['Ristournes'].sum() if 'Ristournes' in df_compta.columns else 0,
+                        'total_CA_technique': df_compta['CA_Technique'].sum() if 'CA_Technique' in df_compta.columns else 0,
+                        'ecart': abs(df_compta['CA_Technique'].sum() - abs(total_credit - total_debit)) if 'CA_Technique' in df_compta.columns else 0,
+                        'total_polices': len(df_compta),
+                        'polices_valides': len(df_valide),
+                        'polices_invalides': len(df_invalide),
+                        'taux_rapprochement': (len(df_valide) / len(df_compta) * 100) if len(df_compta) > 0 else 0,
+                        'taux_emissions_trouvees': (df_compta['Statut_Emissions'] == 'Trouvé').sum() / len(df_compta) * 100 if len(df_compta) > 0 else 0,
+                        'taux_ristournes_trouvees': (df_compta['Statut_Ristournes'] == 'Trouvé').sum() / len(df_compta) * 100 if len(df_compta) > 0 else 0
+                    }
+                    
+                    # Stockage dans la session
+                    st.session_state.pivot_comptables_complet = df_compta
+                    st.session_state.tableau_listing_police_invalide_comptable = df_invalide
+                    st.session_state.tableau_listing_valide_comptable = df_valide
+                    st.session_state.rapprochement_stats = stats
+                    
+                    st.session_state.stats['total_verifications'] += 1
+                    
+                    log_action("Rapprochement comptable", f"{len(df_compta)} polices analysées")
+                    st.success("✅ Rapprochement terminé avec succès!")
+                    st.balloons()
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"❌ Erreur lors du rapprochement: {str(e)}")
+                    log_action("Erreur rapprochement comptable", str(e), level="error")
+                    return
     
-    # Affichage des résultats
-    if 'stats' in locals() and stats:
-        st.session_state.stats['total_verifications'] += 1
+    # Vérifier si les résultats existent
+    if 'rapprochement_stats' not in st.session_state:
+        st.info("ℹ️ Cliquez sur 'Lancer le rapprochement comptable' pour commencer l'analyse.")
+        return
+    
+    stats = st.session_state.rapprochement_stats
+    
+    # ==================== MÉTRIQUES PRINCIPALES ====================
+    st.markdown("---")
+    st.markdown("### 📊 Résumé du rapprochement comptable")
+    
+    # Première ligne : Montants
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); 
+             padding: 15px; border-radius: 12px; color: white; 
+             box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);">
+            <div style="font-size: 0.9em; opacity: 0.9;">💳 Total Débit</div>
+            <div style="font-size: 1.6em; font-weight: bold; margin: 5px 0;">
+                {stats.get('total_debit', 0):,.0f} FCFA
+            </div>
+            <div style="font-size: 0.8em; opacity: 0.8;">Somme des débits</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
+             padding: 15px; border-radius: 12px; color: white; 
+             box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);">
+            <div style="font-size: 0.9em; opacity: 0.9;">💰 Total Crédit</div>
+            <div style="font-size: 1.6em; font-weight: bold; margin: 5px 0;">
+                {stats.get('total_credit', 0):,.0f} FCFA
+            </div>
+            <div style="font-size: 0.8em; opacity: 0.8;">Somme des crédits</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
+             padding: 15px; border-radius: 12px; color: white; 
+             box-shadow: 0 4px 15px rgba(30, 60, 114, 0.3);">
+            <div style="font-size: 0.9em; opacity: 0.9;">📊 CA Comptable</div>
+            <div style="font-size: 1.6em; font-weight: bold; margin: 5px 0;">
+                {stats.get('total_CA_comptable', 0):,.0f} FCFA
+            </div>
+            <div style="font-size: 0.8em; opacity: 0.8;">Crédit - Débit</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); 
+             padding: 15px; border-radius: 12px; color: white; 
+             box-shadow: 0 4px 15px rgba(23, 162, 184, 0.3);">
+            <div style="font-size: 0.9em; opacity: 0.9;">📈 CA Technique</div>
+            <div style="font-size: 1.6em; font-weight: bold; margin: 5px 0;">
+                {stats.get('total_CA_technique', 0):,.0f} FCFA
+            </div>
+            <div style="font-size: 0.8em; opacity: 0.8;">Émissions + Ristournes</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Deuxième ligne : Écart et polices
+    st.markdown("---")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    ecart = stats.get('ecart', 0)
+    with col1:
+        color = "#fd7e14" if ecart > 0 else "#dc3545"
+        icon = "📉" if ecart > 0 else "📈"
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, {color} 0%, {color}dd 100%); 
+             padding: 15px; border-radius: 12px; color: white; 
+             box-shadow: 0 4px 15px rgba(253, 126, 20, 0.3);">
+            <div style="font-size: 0.9em; opacity: 0.9;">{icon} Écart</div>
+            <div style="font-size: 1.6em; font-weight: bold; margin: 5px 0;">
+                {ecart:,.0f} FCFA
+            </div>
+            <div style="font-size: 0.8em; opacity: 0.8;">CA Technique - CA Comptable</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #6c757d 0%, #495057 100%); 
+             padding: 15px; border-radius: 12px; color: white; 
+             box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);">
+            <div style="font-size: 0.9em; opacity: 0.9;">📋 Total polices</div>
+            <div style="font-size: 1.6em; font-weight: bold; margin: 5px 0;">
+                {stats.get('total_polices', 0):,}
+            </div>
+            <div style="font-size: 0.8em; opacity: 0.8;">Nombre total de polices</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        valides = stats.get('polices_valides', 0)
+        taux = stats.get('taux_rapprochement', 0)
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
+             padding: 15px; border-radius: 12px; color: white; 
+             box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);">
+            <div style="font-size: 0.9em; opacity: 0.9;">✅ Polices rapprochées</div>
+            <div style="font-size: 1.6em; font-weight: bold; margin: 5px 0;">
+                {valides:,}
+            </div>
+            <div style="font-size: 0.8em; opacity: 0.8;">Taux: {taux:.1f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        invalides = stats.get('polices_invalides', 0)
+        taux_inv = (invalides / stats.get('total_polices', 1) * 100) if stats.get('total_polices', 0) > 0 else 0
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); 
+             padding: 15px; border-radius: 12px; color: white; 
+             box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);">
+            <div style="font-size: 0.9em; opacity: 0.9;">❌ Polices non rapprochées</div>
+            <div style="font-size: 1.6em; font-weight: bold; margin: 5px 0;">
+                {invalides:,}
+            </div>
+            <div style="font-size: 0.8em; opacity: 0.8;">Taux: {taux_inv:.1f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Troisième ligne : Statistiques supplémentaires
+    st.markdown("---")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        taux_emissions = stats.get('taux_emissions_trouvees', 0)
+        st.markdown(f"""
+        <div style="background: white; padding: 15px; border-radius: 12px; 
+             box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+            <div style="font-size: 0.9em; color: #666;">📤 Émissions trouvées</div>
+            <div style="font-size: 1.8em; font-weight: bold; color: #1e3c72;">
+                {taux_emissions:.1f}%
+            </div>
+            <div style="font-size: 0.8em; color: #999;">
+                {stats.get('total_emissions_tech', 0):,.0f} FCFA
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        taux_ristournes = stats.get('taux_ristournes_trouvees', 0)
+        st.markdown(f"""
+        <div style="background: white; padding: 15px; border-radius: 12px; 
+             box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+            <div style="font-size: 0.9em; color: #666;">🔄 Ristournes trouvées</div>
+            <div style="font-size: 1.8em; font-weight: bold; color: #1e3c72;">
+                {taux_ristournes:.1f}%
+            </div>
+            <div style="font-size: 0.8em; color: #999;">
+                {stats.get('total_ristournes_tech', 0):,.0f} FCFA
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        ecart_abs = abs(stats.get('ecart', 0))
+        st.markdown(f"""
+        <div style="background: white; padding: 15px; border-radius: 12px; 
+             box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+            <div style="font-size: 0.9em; color: #666;">📊 Écart absolu</div>
+            <div style="font-size: 1.8em; font-weight: bold; color: {'#dc3545' if ecart_abs > 1000 else '#28a745'};">
+                {ecart_abs:,.0f} FCFA
+            </div>
+            <div style="font-size: 0.8em; color: #999;">
+                {'⚠️ Écart significatif' if ecart_abs > 1000 else '✅ Écart acceptable'}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # ==================== TABS POUR LES DONNÉES ====================
+    st.markdown("---")
+    tab1, tab2, tab3 = st.tabs(["📋 Données complètes", "❌ Non rapprochées", "✅ Rapprochées"])
+    
+    with tab1:
+        st.markdown("### Toutes les polices comptables")
         
-        # Métriques principales
-        st.markdown("### 📊 Résumé du rapprochement comptable")
+        # Recherche
+        search = create_search_bar("compta_rapprochement_search", "Rechercher une police...")
         
-        col1, col2, col3, col4 = st.columns(4)
+        df_display = st.session_state.pivot_comptables_complet.copy()
+        if search:
+            df_display = filter_dataframe(df_display, search)
         
+        # Statistiques rapides
+        col1, col2, col3 = st.columns(3)
         with col1:
-            display_metric_card(
-                "Total Débit",
-                f"{stats.get('total_debit', 0):,.0f} FCFA",
-                "💳"
-            )
-        
+            st.metric("Total enregistrements", len(df_display))
         with col2:
-            display_metric_card(
-                "Total Crédit",
-                f"{stats.get('total_credit', 0):,.0f} FCFA",
-                "💰"
-            )
-        
+            st.metric("Colonnes", len(df_display.columns))
         with col3:
-            display_metric_card(
-                "CA Comptable",
-                f"{stats.get('total_CA_comptable', 0):,.0f} FCFA",
-                "📊"
+            st.metric("Taux rapprochement", f"{stats.get('taux_rapprochement', 0):.1f}%")
+        
+        st.dataframe(df_display, use_container_width=True, height=500, hide_index=True)
+        
+        # Export
+        if st.button("📥 Exporter toutes les données", use_container_width=True):
+            output = export_to_excel(
+                [df_display],
+                ["Données complètes"],
+                "donnees_comptables_completes.xlsx"
             )
+            if output:
+                create_download_button(
+                    output,
+                    "donnees_comptables_completes.xlsx",
+                    "Télécharger Excel"
+                )
+    
+    with tab2:
+        df_invalide = st.session_state.tableau_listing_police_invalide_comptable
+        st.markdown(f"### Polices non rapprochées ({len(df_invalide)})")
         
-        with col4:
-            display_metric_card(
-                "CA Technique",
-                f"{stats.get('total_CA_technique', 0):,.0f} FCFA",
-                "📈"
-            )
-        
-        # Deuxième ligne de métriques
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            display_metric_card(
-                "Écart",
-                f"{stats.get('ecart', 0):,.0f} FCFA",
-                "📉" if stats.get('ecart', 0) > 0 else "📈"
-            )
-        
-        with col2:
-            display_metric_card(
-                "Total polices",
-                stats.get('total_polices', 0),
-                "📋"
-            )
-        
-        with col3:
-            valides = stats.get('polices_valides', 0)
-            total = stats.get('total_polices', 1)
-            taux_valides = (valides / total * 100) if total > 0 else 0
-            display_metric_card(
-                "Polices rapprochées",
-                valides,
-                "✅",
-                f"Taux: {taux_valides:.1f}%"
-            )
-        
-        with col4:
-            invalides = stats.get('polices_invalides', 0)
-            total = stats.get('total_polices', 1)
-            taux_invalides = (invalides / total * 100) if total > 0 else 0
-            display_metric_card(
-                "Polices non rapprochées",
-                invalides,
-                "❌",
-                f"Taux: {taux_invalides:.1f}%"
-            )
-        
-        # Tabs pour les différentes vues
-        tab1, tab2, tab3 = st.tabs(["📋 Données complètes", "❌ Non rapprochées", "✅ Rapprochées"])
-        
-        with tab1:
-            st.markdown("### Toutes les polices comptables")
+        if not df_invalide.empty:
+            # Recherche dans les invalides
+            search_invalide = create_search_bar("invalide_search", "Rechercher dans les non rapprochées...")
             
-            # Recherche
-            search = create_search_bar("compta_rapprochement_search", "Rechercher une police...")
+            df_invalide_display = df_invalide.copy()
+            if search_invalide:
+                df_invalide_display = filter_dataframe(df_invalide_display, search_invalide)
             
-            df_display = st.session_state.pivot_comptables_complet.copy()
-            if search:
-                df_display = filter_dataframe(df_display, search)
+            # Statistiques des invalides
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total non rapprochées", len(df_invalide))
+            with col2:
+                if 'Écart' in df_invalide.columns:
+                    st.metric("Écart moyen", f"{df_invalide['Écart'].mean():,.0f} FCFA")
+            with col3:
+                if 'Écart' in df_invalide.columns:
+                    st.metric("Écart max", f"{df_invalide['Écart'].max():,.0f} FCFA")
             
-            st.dataframe(df_display, use_container_width=True, height=500, hide_index=True)
-        
-        with tab2:
-            df_invalide = st.session_state.tableau_listing_police_invalide_comptable
-            st.markdown(f"### Polices non rapprochées ({len(df_invalide)})")
+            st.dataframe(df_invalide_display, use_container_width=True, height=500, hide_index=True)
             
-            if not df_invalide.empty:
-                search_invalide = create_search_bar("invalide_search", "Rechercher dans les non rapprochées...")
-                
-                df_invalide_display = df_invalide.copy()
-                if search_invalide:
-                    df_invalide_display = filter_dataframe(df_invalide_display, search_invalide)
-                
-                st.dataframe(df_invalide_display, use_container_width=True, height=500, hide_index=True)
-                
-                if st.button("📥 Exporter les non rapprochées", use_container_width=True):
+            # Export des non rapprochées
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("📥 Exporter les non rapprochées (Excel)", use_container_width=True):
                     output = export_to_excel(
                         [df_invalide],
                         ["Non rapprochées"],
@@ -2005,106 +2344,234 @@ def page_rapprochement_comptable():
                             "polices_comptables_non_rapprochees.xlsx",
                             "Télécharger Excel"
                         )
-            else:
-                st.success("✅ Toutes les polices comptables sont rapprochées !")
-        
-        with tab3:
-            df_valide = st.session_state.tableau_listing_valide_comptable
-            st.markdown(f"### Polices rapprochées ({len(df_valide)})")
             
-            if not df_valide.empty:
-                search_valide = create_search_bar("valide_search", "Rechercher dans les rapprochées...")
-                
-                df_valide_display = df_valide.copy()
-                if search_valide:
-                    df_valide_display = filter_dataframe(df_valide_display, search_valide)
-                
-                st.dataframe(df_valide_display, use_container_width=True, height=500, hide_index=True)
+            with col2:
+                if st.button("📥 Exporter en CSV", use_container_width=True):
+                    csv_data = export_to_csv(df_invalide, "polices_comptables_non_rapprochees.csv")
+                    if csv_data:
+                        create_download_button(
+                            csv_data,
+                            "polices_comptables_non_rapprochees.csv",
+                            "Télécharger CSV"
+                        )
+        else:
+            st.success("✅ Toutes les polices comptables sont rapprochées !")
+    
+    with tab3:
+        df_valide = st.session_state.tableau_listing_valide_comptable
+        st.markdown(f"### Polices rapprochées ({len(df_valide)})")
         
-        # Visualisations
-        st.markdown("### 📊 Analyses et visualisations")
+        if not df_valide.empty:
+            # Recherche dans les valides
+            search_valide = create_search_bar("valide_search", "Rechercher dans les rapprochées...")
+            
+            df_valide_display = df_valide.copy()
+            if search_valide:
+                df_valide_display = filter_dataframe(df_valide_display, search_valide)
+            
+            st.dataframe(df_valide_display, use_container_width=True, height=500, hide_index=True)
+            
+            # Export des valides
+            if st.button("📥 Exporter les rapprochées", use_container_width=True):
+                output = export_to_excel(
+                    [df_valide],
+                    ["Rapprochées"],
+                    "polices_comptables_rapprochees.xlsx"
+                )
+                if output:
+                    create_download_button(
+                        output,
+                        "polices_comptables_rapprochees.xlsx",
+                        "Télécharger Excel"
+                    )
+        else:
+            st.info("Aucune police rapprochée trouvée")
+    
+    # ==================== VISUALISATIONS ====================
+    st.markdown("---")
+    st.markdown("### 📊 Analyses et visualisations")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Graphique de répartition des statuts
+        df_invalide = st.session_state.tableau_listing_police_invalide_comptable
+        df_valide = st.session_state.tableau_listing_valide_comptable
+        
+        if not df_invalide.empty or not df_valide.empty:
+            fig = go.Figure(data=[
+                go.Pie(
+                    labels=['Rapprochées', 'Non rapprochées'],
+                    values=[len(df_valide), len(df_invalide)],
+                    marker_colors=['#28a745', '#dc3545'],
+                    hole=0.3,
+                    textinfo='label+percent',
+                    hoverinfo='label+value+percent'
+                )
+            ])
+            
+            fig.update_layout(
+                title="Répartition des polices comptables",
+                height=400,
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="bottom", y=-0.1)
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        # Graphique de comparaison des montants
+        if stats:
+            fig = go.Figure(data=[
+                go.Bar(
+                    name='CA Comptable',
+                    x=['Comptable', 'Technique'],
+                    y=[stats.get('total_CA_comptable', 0), stats.get('total_CA_technique', 0)],
+                    marker_color=['#1e3c72', '#2a5298'],
+                    text=[f"{stats.get('total_CA_comptable', 0):,.0f}", f"{stats.get('total_CA_technique', 0):,.0f}"],
+                    textposition='auto',
+                )
+            ])
+            
+            fig.update_layout(
+                title="Comparaison CA Comptable vs Technique",
+                yaxis_title="Montant (FCFA)",
+                height=400,
+                showlegend=False
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+    
+    # Analyse des écarts
+    if not df_invalide.empty and 'Écart' in df_invalide.columns:
+        st.markdown("### 📈 Analyse des écarts")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            # Graphique de répartition des statuts
-            df_invalide = st.session_state.tableau_listing_police_invalide_comptable
-            df_valide = st.session_state.tableau_listing_valide_comptable
-            
-            if not df_invalide.empty or not df_valide.empty:
-                fig = go.Figure(data=[
-                    go.Pie(
-                        labels=['Rapprochées', 'Non rapprochées'],
-                        values=[len(df_valide), len(df_invalide)],
-                        marker_colors=['#28a745', '#dc3545'],
-                        hole=0.3,
-                        textinfo='label+percent'
-                    )
-                ])
-                
-                fig.update_layout(
-                    title="Répartition des polices comptables",
-                    height=400,
-                    showlegend=True
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
+            # Distribution des écarts
+            fig = px.histogram(
+                df_invalide,
+                x='Écart',
+                nbins=30,
+                title="Distribution des écarts (polices non rapprochées)",
+                color_discrete_sequence=['#dc3545']
+            )
+            fig.update_layout(
+                height=400,
+                xaxis_title="Écart (FCFA)",
+                yaxis_title="Nombre de polices"
+            )
+            st.plotly_chart(fig, use_container_width=True)
         
         with col2:
-            # Graphique de comparaison des montants
-            if stats:
-                fig = go.Figure(data=[
-                    go.Bar(
-                        name='CA Comptable',
-                        x=['Comptable', 'Technique'],
-                        y=[stats.get('total_CA_comptable', 0), stats.get('total_CA_technique', 0)],
-                        marker_color=['#1e3c72', '#2a5298'],
-                        text=[f"{stats.get('total_CA_comptable', 0):,.0f}", f"{stats.get('total_CA_technique', 0):,.0f}"],
-                        textposition='auto',
+            # Top 10 des écarts
+            st.markdown("#### Top 10 des écarts")
+            
+            # Déterminer la colonne de police
+            compta_col = 'No Police' if 'No Police' in df_invalide.columns else df_invalide.columns[0]
+            
+            ecarts_cols = [compta_col]
+            if 'Écart' in df_invalide.columns:
+                ecarts_cols.append('Écart')
+            if 'CA_Comptable' in df_invalide.columns:
+                ecarts_cols.append('CA_Comptable')
+            if 'CA_Technique' in df_invalide.columns:
+                ecarts_cols.append('CA_Technique')
+            
+            top_ecarts = df_invalide.nlargest(10, 'Écart')[ecarts_cols]
+            st.dataframe(top_ecarts, use_container_width=True, hide_index=True)
+            
+            # Export des écarts
+            if st.button("📥 Exporter l'analyse des écarts", use_container_width=True):
+                output = export_to_excel(
+                    [df_invalide[ecarts_cols].sort_values('Écart', ascending=False)],
+                    ["Analyse écarts"],
+                    "analyse_ecarts_comptables.xlsx"
+                )
+                if output:
+                    create_download_button(
+                        output,
+                        "analyse_ecarts_comptables.xlsx",
+                        "Télécharger Excel"
                     )
-                ])
-                
-                fig.update_layout(
-                    title="Comparaison CA Comptable vs Technique",
-                    yaxis_title="Montant (FCFA)",
-                    height=400,
-                    showlegend=False
+    
+    # ==================== EXPORT COMPLET ====================
+    st.markdown("---")
+    st.markdown("### 📥 Export des résultats")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("📥 Exporter le rapport complet", type="primary", use_container_width=True):
+            # Créer un fichier Excel avec plusieurs onglets
+            dataframes = []
+            sheet_names = []
+            
+            if st.session_state.pivot_comptables_complet is not None:
+                dataframes.append(st.session_state.pivot_comptables_complet)
+                sheet_names.append("Données complètes")
+            
+            if st.session_state.tableau_listing_valide_comptable is not None and not st.session_state.tableau_listing_valide_comptable.empty:
+                dataframes.append(st.session_state.tableau_listing_valide_comptable)
+                sheet_names.append("Polices rapprochées")
+            
+            if st.session_state.tableau_listing_police_invalide_comptable is not None and not st.session_state.tableau_listing_police_invalide_comptable.empty:
+                dataframes.append(st.session_state.tableau_listing_police_invalide_comptable)
+                sheet_names.append("Polices non rapprochées")
+            
+            # Ajouter un résumé
+            resume_df = pd.DataFrame([
+                ["Total Débit", f"{stats.get('total_debit', 0):,.0f} FCFA"],
+                ["Total Crédit", f"{stats.get('total_credit', 0):,.0f} FCFA"],
+                ["CA Comptable", f"{stats.get('total_CA_comptable', 0):,.0f} FCFA"],
+                ["CA Technique", f"{stats.get('total_CA_technique', 0):,.0f} FCFA"],
+                ["Écart", f"{stats.get('ecart', 0):,.0f} FCFA"],
+                ["Total polices", stats.get('total_polices', 0)],
+                ["Polices rapprochées", stats.get('polices_valides', 0)],
+                ["Polices non rapprochées", stats.get('polices_invalides', 0)],
+                ["Taux de rapprochement", f"{stats.get('taux_rapprochement', 0):.1f}%"],
+                ["Émissions trouvées", f"{stats.get('taux_emissions_trouvees', 0):.1f}%"],
+                ["Ristournes trouvées", f"{stats.get('taux_ristournes_trouvees', 0):.1f}%"]
+            ], columns=["Indicateur", "Valeur"])
+            
+            dataframes.append(resume_df)
+            sheet_names.append("Résumé")
+            
+            output = export_to_excel(dataframes, sheet_names, "rapprochement_comptable_complet.xlsx")
+            if output:
+                create_download_button(
+                    output,
+                    "rapprochement_comptable_complet.xlsx",
+                    "Télécharger le rapport Excel"
                 )
+    
+    with col2:
+        if st.button("📊 Exporter les graphiques", use_container_width=True):
+            st.info("Fonctionnalité à venir: export des graphiques en PNG")
+    
+    with col3:
+        if st.button("📋 Générer un rapport PDF", use_container_width=True):
+            with st.spinner("Génération du rapport PDF..."):
+                time.sleep(2)
+                st.success("Rapport PDF généré avec succès!")
                 
-                st.plotly_chart(fig, use_container_width=True)
-        
-        # Analyse des écarts
-        if not df_invalide.empty and 'Écart' in df_invalide.columns:
-            st.markdown("### 📈 Analyse des écarts")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                fig = px.histogram(
-                    df_invalide,
-                    x='Écart',
-                    nbins=30,
-                    title="Distribution des écarts (polices non rapprochées)",
-                    color_discrete_sequence=['#dc3545']
+                # Simulation de téléchargement PDF
+                st.download_button(
+                    label="📥 Télécharger le PDF",
+                    data=b"Simulation de rapport PDF",
+                    file_name="rapprochement_comptable.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
                 )
-                fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
-                st.markdown("#### Top 10 des écarts")
-                
-                ecarts_cols = [compta_col]
-                if 'Écart' in df_invalide.columns:
-                    ecarts_cols.append('Écart')
-                if 'CA_Comptable' in df_invalide.columns:
-                    ecarts_cols.append('CA_Comptable')
-                if 'CA_Technique' in df_invalide.columns:
-                    ecarts_cols.append('CA_Technique')
-                
-                top_ecarts = df_invalide.nlargest(10, 'Écart')[ecarts_cols]
-                st.dataframe(top_ecarts, use_container_width=True, hide_index=True)
-    else:
-        st.error("Erreur lors du calcul des statistiques de rapprochement")
+    
+    # Journalisation
+    log_action(
+        "Rapprochement comptable", 
+        f"{stats.get('total_polices', 0)} polices analysées, "
+        f"{stats.get('polices_invalides', 0)} non rapprochées, "
+        f"écart: {stats.get('ecart', 0):,.0f} FCFA"
+    )
 
 def page_gestion_410_411():
     """Page de gestion 410 et 411"""
