@@ -1263,6 +1263,7 @@ def page_accueil():
         """, unsafe_allow_html=True)
         
         st.markdown(f"""
+        </br>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div style="background: #f8f9fa; padding: 10px; border-radius: 8px; text-align: center;">
                 <div style="font-size: 1.5em; font-weight: bold; color: #1e3c72;">
