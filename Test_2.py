@@ -837,16 +837,25 @@ def rapprochement_technique_comptable(tech_df, compta_df):
         tech = tech_df.copy()
         compta = compta_df.copy()
         
+        # Nettoyage des noms de colonnes
+        tech.columns = tech.columns.str.strip()
+        compta.columns = compta.columns.str.strip()
+        
         # Déterminer les colonnes de jointure
         tech_col = 'Nouvelle_Police' if 'Nouvelle_Police' in tech.columns else tech.columns[0]
         compta_col = 'No Police' if 'No Police' in compta.columns else compta.columns[0]
+        
+        # Conversion des colonnes en string pour la jointure
+        tech[tech_col] = tech[tech_col].astype(str).str.strip()
+        compta[compta_col] = compta[compta_col].astype(str).str.strip()
         
         # Renommer pour la fusion
         tech_renamed = tech.rename(columns={tech_col: 'Police'})
         compta_renamed = compta.rename(columns={compta_col: 'Police'})
         
-        # Conversion numérique
-        for col in ['Emissions', 'Ristournes', 'Débit', 'Crédit']:
+        # Conversion numérique des colonnes pertinentes
+        numeric_cols = ['Emissions', 'Ristournes', 'Débit', 'Crédit', 'Chiffre affaire']
+        for col in numeric_cols:
             if col in tech_renamed.columns:
                 tech_renamed[col] = pd.to_numeric(tech_renamed[col], errors='coerce').fillna(0)
             if col in compta_renamed.columns:
@@ -861,29 +870,38 @@ def rapprochement_technique_comptable(tech_df, compta_df):
             suffixes=('_tech', '_compta')
         )
         
-        # Calcul des écarts
+        # Remplir les NaN
+        merged = merged.fillna(0)
+        
+        # Calcul des écarts - Utiliser les noms de colonnes avec suffixes
         if 'Emissions_tech' in merged.columns and 'Débit_compta' in merged.columns and 'Crédit_compta' in merged.columns:
-            merged['CA_Technique'] = merged['Emissions_tech']
+            merged['CA_Technique'] = merged['Emissions_tech'] + merged.get('Ristournes_tech', 0)
             merged['CA_Comptable'] = abs(merged['Crédit_compta'] - merged['Débit_compta'])
             merged['Écart'] = merged['CA_Technique'] - merged['CA_Comptable']
             merged['Statut'] = merged['Écart'].apply(
                 lambda x: 'Rapproché' if abs(x) < 0.01 else 'Non rapproché'
             )
+        else:
+            # Fallback si les colonnes n'existent pas
+            merged['CA_Technique'] = 0
+            merged['CA_Comptable'] = 0
+            merged['Écart'] = 0
+            merged['Statut'] = 'Non rapproché'
         
         # Statistiques
         stats = {
             'total_polices': len(merged),
             'polices_techniques': len(tech_renamed),
             'polices_comptables': len(compta_renamed),
-            'polices_communes': len(merged[merged['Police'].notna() & merged['Emissions_tech'].notna() & merged['Débit_compta'].notna()]),
-            'polices_tech_only': len(merged[merged['Emissions_tech'].notna() & merged['Débit_compta'].isna()]),
-            'polices_compta_only': len(merged[merged['Emissions_tech'].isna() & merged['Débit_compta'].notna()])
+            'polices_communes': len(merged[(merged['Emissions_tech'] != 0) & (merged['Débit_compta'] != 0)]) if 'Emissions_tech' in merged.columns and 'Débit_compta' in merged.columns else 0,
+            'polices_tech_only': len(merged[(merged['Emissions_tech'] != 0) & (merged['Débit_compta'] == 0)]) if 'Emissions_tech' in merged.columns and 'Débit_compta' in merged.columns else 0,
+            'polices_compta_only': len(merged[(merged['Emissions_tech'] == 0) & (merged['Débit_compta'] != 0)]) if 'Emissions_tech' in merged.columns and 'Débit_compta' in merged.columns else 0
         }
         
         if 'Statut' in merged.columns:
             stats['rapprochees'] = len(merged[merged['Statut'] == 'Rapproché'])
             stats['non_rapprochees'] = len(merged[merged['Statut'] == 'Non rapproché'])
-            stats['ecart_total'] = merged['Écart'].sum()
+            stats['ecart_total'] = merged['Écart'].sum() if 'Écart' in merged.columns else 0
         
         log_action("Rapprochement", f"{stats['polices_communes']} polices communes")
         return merged, stats
@@ -1760,10 +1778,16 @@ def page_rapprochement_comptable():
     # Vérification des données
     if st.session_state.pivot_techniques is None:
         st.warning("⚠️ Données techniques manquantes. Veuillez d'abord importer les données techniques.")
+        if st.button("📥 Aller à la gestion technique"):
+            st.session_state.page = "Gestion Technique"
+            st.rerun()
         return
     
     if st.session_state.pivot_comptables is None:
         st.warning("⚠️ Données comptables manquantes. Veuillez d'abord importer les données comptables.")
+        if st.button("💰 Aller à la gestion comptable"):
+            st.session_state.page = "Gestion Comptable"
+            st.rerun()
         return
     
     with st.spinner("Calcul du rapprochement comptable en cours..."):
@@ -1772,9 +1796,17 @@ def page_rapprochement_comptable():
             df_tech = st.session_state.pivot_techniques.copy()
             df_compta = st.session_state.pivot_comptables.copy()
             
+            # Nettoyage des noms de colonnes
+            df_tech.columns = df_tech.columns.str.strip()
+            df_compta.columns = df_compta.columns.str.strip()
+            
             # Déterminer les colonnes de police
             tech_col = 'Nouvelle_Police' if 'Nouvelle_Police' in df_tech.columns else df_tech.columns[0]
             compta_col = 'No Police' if 'No Police' in df_compta.columns else df_compta.columns[0]
+            
+            # Conversion en string pour la jointure
+            df_tech[tech_col] = df_tech[tech_col].astype(str).str.strip()
+            df_compta[compta_col] = df_compta[compta_col].astype(str).str.strip()
             
             # Ajouter les colonnes techniques aux données comptables
             df_compta['Ristournes'] = 0
@@ -1782,50 +1814,64 @@ def page_rapprochement_comptable():
             df_compta['Statut_Ristournes'] = 'Non trouvé'
             df_compta['Statut_Emissions'] = 'Non trouvé'
             
-            # Pour chaque ligne comptable, chercher la correspondance
+            # Pour chaque ligne comptable, chercher la correspondance dans les données techniques
             for index, row in df_compta.iterrows():
                 police_compta = str(row[compta_col]).strip()
                 
+                # Chercher la correspondance
                 correspondance = df_tech[df_tech[tech_col].astype(str).str.strip() == police_compta]
                 
                 if not correspondance.empty:
+                    # Récupérer les premières valeurs
                     if 'Ristournes' in correspondance.columns:
-                        df_compta.at[index, 'Ristournes'] = pd.to_numeric(correspondance['Ristournes'].values[0], errors='coerce')
+                        val = correspondance['Ristournes'].iloc[0]
+                        df_compta.at[index, 'Ristournes'] = pd.to_numeric(val, errors='coerce') if val != 0 else 0
                         df_compta.at[index, 'Statut_Ristournes'] = 'Trouvé'
                     
                     if 'Emissions' in correspondance.columns:
-                        df_compta.at[index, 'Emissions'] = pd.to_numeric(correspondance['Emissions'].values[0], errors='coerce')
+                        val = correspondance['Emissions'].iloc[0]
+                        df_compta.at[index, 'Emissions'] = pd.to_numeric(val, errors='coerce') if val != 0 else 0
                         df_compta.at[index, 'Statut_Emissions'] = 'Trouvé'
             
             # Conversion en numérique
-            for col in ['Crédit', 'Débit', 'Emissions', 'Ristournes']:
+            numeric_cols = ['Crédit', 'Débit', 'Emissions', 'Ristournes', 'Montant']
+            for col in numeric_cols:
                 if col in df_compta.columns:
                     df_compta[col] = pd.to_numeric(df_compta[col], errors='coerce').fillna(0)
             
             # Calcul du rapprochement
-            if all(col in df_compta.columns for col in ['Crédit', 'Débit', 'Emissions', 'Ristournes']):
+            if all(col in df_compta.columns for col in ['Crédit', 'Débit']):
                 df_compta['CA_Comptable'] = df_compta['Crédit'] - df_compta['Débit']
+            else:
+                df_compta['CA_Comptable'] = 0
+            
+            if all(col in df_compta.columns for col in ['Emissions', 'Ristournes']):
                 df_compta['CA_Technique'] = df_compta['Emissions'] + df_compta['Ristournes']
-                df_compta['Écart'] = abs(df_compta['CA_Comptable']) - abs(df_compta['CA_Technique'])
-                
-                df_compta['Rapprochement'] = df_compta.apply(
-                    lambda row: 'Rapproché' if abs(row['Écart']) < 0.01 else 'Non rapproché', 
-                    axis=1
-                )
+            else:
+                df_compta['CA_Technique'] = 0
+            
+            df_compta['Écart'] = abs(df_compta['CA_Comptable']) - abs(df_compta['CA_Technique'])
+            df_compta['Rapprochement'] = df_compta.apply(
+                lambda row: 'Rapproché' if abs(row['Écart']) < 0.01 else 'Non rapproché', 
+                axis=1
+            )
             
             # Séparer valides et invalides
-            df_invalide = df_compta[df_compta['Rapprochement'] == 'Non rapproché'] if 'Rapprochement' in df_compta.columns else pd.DataFrame()
-            df_valide = df_compta[df_compta['Rapprochement'] == 'Rapproché'] if 'Rapprochement' in df_compta.columns else pd.DataFrame()
+            df_invalide = df_compta[df_compta['Rapprochement'] == 'Non rapproché']
+            df_valide = df_compta[df_compta['Rapprochement'] == 'Rapproché']
             
             # Statistiques
+            total_debit = df_compta['Débit'].sum() if 'Débit' in df_compta.columns else 0
+            total_credit = df_compta['Crédit'].sum() if 'Crédit' in df_compta.columns else 0
+            
             stats = {
-                'total_debit': df_compta['Débit'].sum() if 'Débit' in df_compta.columns else 0,
-                'total_credit': df_compta['Crédit'].sum() if 'Crédit' in df_compta.columns else 0,
-                'total_CA_comptable': abs(df_compta['Crédit'].sum() - df_compta['Débit'].sum()) if 'Débit' in df_compta.columns and 'Crédit' in df_compta.columns else 0,
+                'total_debit': total_debit,
+                'total_credit': total_credit,
+                'total_CA_comptable': abs(total_credit - total_debit),
                 'total_emissions_tech': df_compta['Emissions'].sum() if 'Emissions' in df_compta.columns else 0,
                 'total_ristournes_tech': df_compta['Ristournes'].sum() if 'Ristournes' in df_compta.columns else 0,
-                'total_CA_technique': abs(df_compta['Emissions'].sum() + df_compta['Ristournes'].sum()) if 'Emissions' in df_compta.columns and 'Ristournes' in df_compta.columns else 0,
-                'ecart': abs(abs(df_compta['Emissions'].sum() + df_compta['Ristournes'].sum()) - abs(df_compta['Crédit'].sum() - df_compta['Débit'].sum())) if all(col in df_compta.columns for col in ['Emissions', 'Ristournes', 'Crédit', 'Débit']) else 0,
+                'total_CA_technique': df_compta['CA_Technique'].sum() if 'CA_Technique' in df_compta.columns else 0,
+                'ecart': abs(df_compta['CA_Technique'].sum() - abs(total_credit - total_debit)) if 'CA_Technique' in df_compta.columns else 0,
                 'total_polices': len(df_compta),
                 'polices_valides': len(df_valide),
                 'polices_invalides': len(df_invalide)
@@ -1844,7 +1890,7 @@ def page_rapprochement_comptable():
             return
     
     # Affichage des résultats
-    if stats:
+    if 'stats' in locals() and stats:
         st.session_state.stats['total_verifications'] += 1
         
         # Métriques principales
@@ -1899,7 +1945,8 @@ def page_rapprochement_comptable():
         
         with col3:
             valides = stats.get('polices_valides', 0)
-            taux_valides = (valides / stats.get('total_polices', 1) * 100) if stats.get('total_polices', 0) > 0 else 0
+            total = stats.get('total_polices', 1)
+            taux_valides = (valides / total * 100) if total > 0 else 0
             display_metric_card(
                 "Polices rapprochées",
                 valides,
@@ -1909,7 +1956,8 @@ def page_rapprochement_comptable():
         
         with col4:
             invalides = stats.get('polices_invalides', 0)
-            taux_invalides = (invalides / stats.get('total_polices', 1) * 100) if stats.get('total_polices', 0) > 0 else 0
+            total = stats.get('total_polices', 1)
+            taux_invalides = (invalides / total * 100) if total > 0 else 0
             display_metric_card(
                 "Polices non rapprochées",
                 invalides,
@@ -2024,6 +2072,39 @@ def page_rapprochement_comptable():
                 )
                 
                 st.plotly_chart(fig, use_container_width=True)
+        
+        # Analyse des écarts
+        if not df_invalide.empty and 'Écart' in df_invalide.columns:
+            st.markdown("### 📈 Analyse des écarts")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                fig = px.histogram(
+                    df_invalide,
+                    x='Écart',
+                    nbins=30,
+                    title="Distribution des écarts (polices non rapprochées)",
+                    color_discrete_sequence=['#dc3545']
+                )
+                fig.update_layout(height=400)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                st.markdown("#### Top 10 des écarts")
+                
+                ecarts_cols = [compta_col]
+                if 'Écart' in df_invalide.columns:
+                    ecarts_cols.append('Écart')
+                if 'CA_Comptable' in df_invalide.columns:
+                    ecarts_cols.append('CA_Comptable')
+                if 'CA_Technique' in df_invalide.columns:
+                    ecarts_cols.append('CA_Technique')
+                
+                top_ecarts = df_invalide.nlargest(10, 'Écart')[ecarts_cols]
+                st.dataframe(top_ecarts, use_container_width=True, hide_index=True)
+    else:
+        st.error("Erreur lors du calcul des statistiques de rapprochement")
 
 def page_gestion_410_411():
     """Page de gestion 410 et 411"""
