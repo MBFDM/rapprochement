@@ -1259,7 +1259,7 @@ def page_accueil():
     with col2:
         st.markdown("""
         <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <h4 style="color: #1e3c72; margin-bottom: 15px;">📊 Statistiques</h4> </br>
+            <h4 style="color: #1e3c72; margin-bottom: 15px;">📊 Statistiques</h4>
         """, unsafe_allow_html=True)
         
         st.markdown(f"""
