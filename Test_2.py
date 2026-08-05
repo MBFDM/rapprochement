@@ -10,35 +10,51 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
-import tempfile
-import glob
-from PIL import Image
 import io
+import re
+import uuid
+import time
+import json
 import base64
 import hashlib
 import sqlite3
-import time
-from streamlit_option_menu import option_menu
-import plotly.figure_factory as ff
-import re
-import uuid
-import bcrypt
-import smtplib
-import shutil
 import logging
-import webbrowser
-import subprocess
-from contextlib import contextmanager
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from cryptography.fernet import Fernet
-from docx import Document
-from docx.shared import Pt, RGBColor
-from docx2pdf import convert
-import fitz
+import shutil
 import warnings
+from contextlib import contextmanager
+from typing import Optional, Dict, List, Any, Tuple
+from pathlib import Path
+import tempfile
+
+# Tentative d'import des modules optionnels
+try:
+    import bcrypt
+except ImportError:
+    bcrypt = None
+
+try:
+    from cryptography.fernet import Fernet
+except ImportError:
+    Fernet = None
+
+try:
+    from docx import Document
+    from docx.shared import Pt, RGBColor
+except ImportError:
+    Document = None
+
+try:
+    from docx2pdf import convert
+except ImportError:
+    convert = None
+
+try:
+    import fitz
+except ImportError:
+    fitz = None
+
 warnings.filterwarnings('ignore')
 
 # ======================== CONFIGURATION DE LA PAGE ========================
@@ -56,7 +72,6 @@ st.set_page_config(
 
 # ======================== CONSTANTES GLOBALES ========================
 DB_FILE = "admin_system.db"
-BACKUP_INTERVAL = 3600  # 1 heure en secondes
 PERMISSIONS_LIST = [
     "admin", "user_manage", "content_manage", 
     "settings_manage", "logs_view", "logs_manage"
@@ -69,7 +84,6 @@ def apply_custom_css():
     <style>
         /* Style global */
         .stApp {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         
@@ -122,191 +136,19 @@ def apply_custom_css():
             margin: 0;
         }
         
-        /* Tableaux */
-        .dataframe {
-            font-size: 0.9em;
-            border-collapse: collapse;
-            width: 100%;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        /* Conteneurs */
+        .content-card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin: 20px 0;
+            transition: transform 0.3s;
         }
         
-        .dataframe th {
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            color: white;
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-        }
-        
-        .dataframe td {
-            padding: 10px;
-            border-bottom: 1px solid #e0e0e0;
-            background-color: white;
-        }
-        
-        .dataframe tr:hover td {
-            background-color: #f5f5f5;
-            transition: background-color 0.3s;
-        }
-        
-        /* Boutons */
-        .stButton > button {
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            color: white;
-            border-radius: 8px;
-            padding: 12px 24px;
-            font-weight: 600;
-            border: none;
-            transition: all 0.3s;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            width: 100%;
-        }
-        
-        .stButton > button:hover {
-            background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0,0,0,0.2);
-        }
-        
-        .stButton > button:active {
-            transform: translateY(0);
-        }
-        
-        /* Bouton secondaire */
-        .stButton > button.secondary {
-            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
-        }
-        
-        /* Bouton succès */
-        .stButton > button.success {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-        }
-        
-        /* Bouton danger */
-        .stButton > button.danger {
-            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-        }
-        
-        /* Barre latérale */
-        .css-1d391kg {
-            background: linear-gradient(180deg, #1e3c72 0%, #0a1a2f 100%);
-        }
-        
-        .sidebar .sidebar-content {
-            background: transparent;
-            color: white;
-            padding: 1rem;
-        }
-        
-        /* Éléments de la barre latérale */
-        .sidebar .sidebar-content .stMarkdown {
-            color: white;
-        }
-        
-        /* Menu option */
-        .nav-link {
-            color: white !important;
-            font-size: 1.1rem !important;
-            padding: 0.75rem 1rem !important;
-            margin: 0.2rem 0 !important;
-            border-radius: 8px !important;
-            transition: all 0.3s !important;
-        }
-        
-        .nav-link:hover {
-            background: rgba(255, 255, 255, 0.1) !important;
-            transform: translateX(5px);
-        }
-        
-        .nav-link-selected {
-            background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%) !important;
-            font-weight: bold !important;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2) !important;
-        }
-        
-        /* Onglets */
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 8px;
-            background-color: #f0f2f6;
-            padding: 0.5rem;
-            border-radius: 10px;
-        }
-        
-        .stTabs [data-baseweb="tab"] {
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            border-radius: 8px;
-            padding: 12px 24px;
-            font-weight: 600;
-            color: white !important;
-            transition: all 0.3s;
-            border: none;
-        }
-        
-        .stTabs [data-baseweb="tab"]:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        }
-        
-        .stTabs [aria-selected="true"] {
-            background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%) !important;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        }
-        
-        /* Messages */
-        .stAlert {
-            border-radius: 10px;
-            border-left: 5px solid;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        
-        .stSuccess {
-            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-            border-left-color: #28a745;
-            color: #155724;
-        }
-        
-        .stError {
-            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
-            border-left-color: #dc3545;
-            color: #721c24;
-        }
-        
-        .stWarning {
-            background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
-            border-left-color: #ffc107;
-            color: #856404;
-        }
-        
-        .stInfo {
-            background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
-            border-left-color: #17a2b8;
-            color: #0c5460;
-        }
-        
-        /* Barre de progression */
-        .stProgress > div > div > div > div {
-            background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
-            border-radius: 10px;
-        }
-        
-        /* Inputs */
-        .stTextInput > div > div > input,
-        .stSelectbox > div > div > select,
-        .stNumberInput > div > div > input {
-            border-radius: 8px;
-            border: 2px solid #e0e0e0;
-            padding: 10px;
-            transition: all 0.3s;
-        }
-        
-        .stTextInput > div > div > input:focus,
-        .stSelectbox > div > div > select:focus,
-        .stNumberInput > div > div > input:focus {
-            border-color: #1e3c72;
-            box-shadow: 0 0 0 3px rgba(30, 60, 114, 0.1);
+        .content-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
         }
         
         /* Badges */
@@ -339,19 +181,14 @@ def apply_custom_css():
             color: white;
         }
         
-        /* Cartes de contenu */
-        .content-card {
-            background: white;
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            margin: 20px 0;
-            transition: transform 0.3s;
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
-        .content-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
         }
         
         /* Pied de page */
@@ -363,197 +200,8 @@ def apply_custom_css():
             border-top: 1px solid #e0e0e0;
             margin-top: 40px;
         }
-        
-        /* Loading spinner personnalisé */
-        .custom-spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #1e3c72;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        /* Animations */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .fade-in {
-            animation: fadeIn 0.5s ease-out;
-        }
-        
-        /* Grille responsive */
-        .grid-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            padding: 20px;
-        }
-        
-        /* Tooltips personnalisés */
-        .tooltip {
-            position: relative;
-            display: inline-block;
-        }
-        
-        .tooltip .tooltiptext {
-            visibility: hidden;
-            width: 200px;
-            background-color: #1e3c72;
-            color: white;
-            text-align: center;
-            border-radius: 6px;
-            padding: 5px;
-            position: absolute;
-            z-index: 1;
-            bottom: 125%;
-            left: 50%;
-            margin-left: -100px;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        
-        .tooltip:hover .tooltiptext {
-            visibility: visible;
-            opacity: 1;
-        }
-        
-        /* Scrollbar personnalisée */
-        ::-webkit-scrollbar {
-            width: 10px;
-            height: 10px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 5px;
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            border-radius: 5px;
-        }
-        
-        ::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%);
-        }
-        
-        /* Switch toggle */
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 60px;
-            height: 34px;
-        }
-        
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            transition: .4s;
-            border-radius: 34px;
-        }
-        
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 26px;
-            width: 26px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-        
-        input:checked + .slider {
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        }
-        
-        input:checked + .slider:before {
-            transform: translateX(26px);
-        }
-        
-        /* Timeline */
-        .timeline {
-            position: relative;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        .timeline::after {
-            content: '';
-            position: absolute;
-            width: 6px;
-            background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%);
-            top: 0;
-            bottom: 0;
-            left: 50%;
-            margin-left: -3px;
-        }
-        
-        .timeline-item {
-            padding: 10px 40px;
-            position: relative;
-            background-color: inherit;
-            width: 50%;
-        }
-        
-        .timeline-item::after {
-            content: '';
-            position: absolute;
-            width: 25px;
-            height: 25px;
-            right: -17px;
-            background-color: white;
-            border: 4px solid #1e3c72;
-            top: 15px;
-            border-radius: 50%;
-            z-index: 1;
-        }
-        
-        .left {
-            left: 0;
-        }
-        
-        .right {
-            left: 50%;
-        }
-        
-        .right::after {
-            left: -16px;
-        }
-        
-        .timeline-content {
-            padding: 20px 30px;
-            background-color: white;
-            position: relative;
-            border-radius: 6px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        }
     </style>
     """, unsafe_allow_html=True)
-
-# Appliquer les styles
-apply_custom_css()
 
 # ======================== INITIALISATION DE LA SESSION ========================
 def init_session_state():
@@ -576,16 +224,12 @@ def init_session_state():
         st.session_state.pivot_techniques = None
     if 'pivot_comptables' not in st.session_state:
         st.session_state.pivot_comptables = None
-    if 'pivot_compte_41' not in st.session_state:
-        st.session_state.pivot_compte_41 = None
     
     # DataFrames
     if 'df_technique' not in st.session_state:
         st.session_state.df_technique = None
     if 'df_comptable' not in st.session_state:
         st.session_state.df_comptable = None
-    if 'df_compte_41' not in st.session_state:
-        st.session_state.df_compte_41 = None
     if 'df_410' not in st.session_state:
         st.session_state.df_410 = None
     if 'df_411' not in st.session_state:
@@ -594,14 +238,12 @@ def init_session_state():
         st.session_state.production_data = None
     
     # Résultats de vérification
-    if 'tableau_listing_police_invalide' not in st.session_state:
-        st.session_state.tableau_listing_police_invalide = None
-    if 'tableau_listing_valide' not in st.session_state:
-        st.session_state.tableau_listing_valide = None
     if 'tableau_listing_police_invalide_comptable' not in st.session_state:
         st.session_state.tableau_listing_police_invalide_comptable = None
     if 'tableau_listing_valide_comptable' not in st.session_state:
         st.session_state.tableau_listing_valide_comptable = None
+    if 'pivot_comptables_complet' not in st.session_state:
+        st.session_state.pivot_comptables_complet = None
     
     # Logs et historique
     if 'logs' not in st.session_state:
@@ -610,8 +252,6 @@ def init_session_state():
         st.session_state.history = []
     
     # Configuration
-    if 'theme' not in st.session_state:
-        st.session_state.theme = "Light"
     if 'page' not in st.session_state:
         st.session_state.page = "Accueil"
     if 'template' not in st.session_state:
@@ -634,8 +274,8 @@ def init_session_state():
             'require_special': True,
             'require_digit': True,
             'max_login_attempts': 5,
-            'lockout_duration': 30,  # minutes
-            'session_timeout': 30,  # minutes
+            'lockout_duration': 30,
+            'session_timeout': 30,
             'two_factor_enabled': False
         }
     
@@ -651,9 +291,52 @@ def init_session_state():
             'show_preview': True,
             'auto_save': True
         }
+    
+    # Pagination
+    if 'tech_page' not in st.session_state:
+        st.session_state.tech_page = 0
+    if 'compta_page' not in st.session_state:
+        st.session_state.compta_page = 0
+    if 'rapprochement_page' not in st.session_state:
+        st.session_state.rapprochement_page = 0
 
-# Initialiser la session
-init_session_state()
+# ======================== FONCTIONS DE LOGGING ========================
+def log_action(action, details="", level="info"):
+    """Enregistre une action dans les logs"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    log_entry = {
+        'timestamp': timestamp,
+        'username': st.session_state.username if st.session_state.authenticated else "anonymous",
+        'action': action,
+        'details': details,
+        'level': level
+    }
+    
+    st.session_state.logs.append(log_entry)
+    
+    # Garder seulement les 1000 derniers logs
+    if len(st.session_state.logs) > 1000:
+        st.session_state.logs = st.session_state.logs[-1000:]
+
+def log_history(action_type, target_user=None, details="", data=None):
+    """Enregistre dans l'historique"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    history_entry = {
+        'timestamp': timestamp,
+        'username': st.session_state.username if st.session_state.authenticated else "system",
+        'action_type': action_type,
+        'target_user': target_user,
+        'details': details,
+        'data': data
+    }
+    
+    st.session_state.history.append(history_entry)
+    
+    # Garder seulement les 500 derniers historiques
+    if len(st.session_state.history) > 500:
+        st.session_state.history = st.session_state.history[-500:]
 
 # ======================== FONCTIONS DE SÉCURITÉ ========================
 class SecurityManager:
@@ -662,12 +345,18 @@ class SecurityManager:
     @staticmethod
     def hash_password(password):
         """Hash un mot de passe avec bcrypt"""
+        if bcrypt is None:
+            # Fallback si bcrypt n'est pas installé
+            return hashlib.sha256(password.encode('utf-8')).hexdigest()
         salt = bcrypt.gensalt()
         return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
     
     @staticmethod
     def verify_password(hashed_password, plain_password):
         """Vérifie un mot de passe"""
+        if bcrypt is None:
+            # Fallback si bcrypt n'est pas installé
+            return hashed_password == hashlib.sha256(plain_password.encode('utf-8')).hexdigest()
         try:
             return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
         except:
@@ -730,363 +419,104 @@ class DatabaseHandler:
     def init_database(self):
         """Initialise la base de données"""
         try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                
-                # Table des utilisateurs
+            conn = sqlite3.connect(self.db_file)
+            cursor = conn.cursor()
+            
+            # Table des utilisateurs
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    password TEXT NOT NULL,
+                    email TEXT,
+                    role TEXT DEFAULT 'user',
+                    permissions TEXT,
+                    status TEXT DEFAULT 'active',
+                    last_login TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # Table des logs
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    username TEXT,
+                    action TEXT NOT NULL,
+                    details TEXT,
+                    ip_address TEXT,
+                    user_agent TEXT
+                )
+            """)
+            
+            # Table de l'historique
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    username TEXT NOT NULL,
+                    action_type TEXT NOT NULL,
+                    target_user TEXT,
+                    details TEXT,
+                    data TEXT
+                )
+            """)
+            
+            # Table des paramètres
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_by TEXT
+                )
+            """)
+            
+            # Créer un admin par défaut si nécessaire
+            cursor.execute("SELECT COUNT(*) FROM users WHERE role='admin'")
+            if cursor.fetchone()[0] == 0:
+                default_password = SecurityManager.hash_password("Admin123!")
                 cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS users (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        username TEXT UNIQUE NOT NULL,
-                        password TEXT NOT NULL,
-                        email TEXT,
-                        role TEXT DEFAULT 'user',
-                        permissions TEXT,
-                        status TEXT DEFAULT 'active',
-                        last_login TIMESTAMP,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
-                
-                # Table des logs
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS logs (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        username TEXT,
-                        action TEXT NOT NULL,
-                        details TEXT,
-                        ip_address TEXT,
-                        user_agent TEXT
-                    )
-                """)
-                
-                # Table de l'historique
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS history (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        username TEXT NOT NULL,
-                        action_type TEXT NOT NULL,
-                        target_user TEXT,
-                        details TEXT,
-                        data TEXT
-                    )
-                """)
-                
-                # Table des paramètres
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS settings (
-                        key TEXT PRIMARY KEY,
-                        value TEXT,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_by TEXT
-                    )
-                """)
-                
-                # Table des sauvegardes
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS backups (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        filename TEXT NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        size INTEGER,
-                        status TEXT DEFAULT 'active'
-                    )
-                """)
-                
-                # Créer un admin par défaut si nécessaire
-                cursor.execute("SELECT COUNT(*) FROM users WHERE role='admin'")
-                if cursor.fetchone()[0] == 0:
-                    default_password = SecurityManager.hash_password("Admin123!")
-                    cursor.execute("""
-                        INSERT INTO users (username, password, email, role, permissions, status)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    """, ("admin", default_password, "admin@agc-vie.com", "admin", "all", "active"))
-                
-                conn.commit()
-                
+                    INSERT INTO users (username, password, email, role, permissions, status)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, ("admin", default_password, "admin@agc-vie.com", "admin", "all", "active"))
+            
+            conn.commit()
+            conn.close()
+            
         except Exception as e:
             st.error(f"Erreur d'initialisation de la base de données: {str(e)}")
     
-    @contextmanager
-    def get_connection(self):
-        """Obtient une connexion à la base de données"""
-        conn = sqlite3.connect(self.db_file)
-        conn.row_factory = sqlite3.Row
-        try:
-            yield conn
-        finally:
-            conn.close()
-    
     def execute_query(self, query, params=()):
         """Exécute une requête SQL"""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            conn.commit()
-            return cursor
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        conn.commit()
+        conn.close()
+        return cursor
     
     def fetch_all(self, query, params=()):
         """Récupère tous les résultats d'une requête"""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            return [dict(row) for row in cursor.fetchall()]
+        conn = sqlite3.connect(self.db_file)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
     
     def fetch_one(self, query, params=()):
         """Récupère un seul résultat"""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            row = cursor.fetchone()
-            return dict(row) if row else None
-
-# ======================== GESTIONNAIRE DE SAUVEGARDE ========================
-class BackupManager:
-    """Gestionnaire de sauvegardes"""
-    
-    def __init__(self, db_file=DB_FILE):
-        self.db_file = db_file
-        self.backup_key = self._get_or_create_key()
-        self.db_handler = DatabaseHandler()
-    
-    def _get_or_create_key(self):
-        """Génère ou récupère la clé de chiffrement"""
-        key_file = "backup_key.key"
-        if os.path.exists(key_file):
-            with open(key_file, "rb") as f:
-                return f.read()
-        else:
-            key = Fernet.generate_key()
-            with open(key_file, "wb") as f:
-                f.write(key)
-            return key
-    
-    def create_backup(self, description=""):
-        """Crée une sauvegarde chiffrée"""
-        try:
-            backup_dir = "backups"
-            os.makedirs(backup_dir, exist_ok=True)
-            
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_id = str(uuid.uuid4())[:8]
-            temp_file = os.path.join(backup_dir, f"temp_backup_{timestamp}.db")
-            backup_file = os.path.join(backup_dir, f"backup_{timestamp}_{backup_id}.enc")
-            
-            # Copier la base de données
-            shutil.copy2(self.db_file, temp_file)
-            
-            # Chiffrer
-            fernet = Fernet(self.backup_key)
-            with open(temp_file, "rb") as f:
-                data = f.read()
-            
-            encrypted = fernet.encrypt(data)
-            
-            with open(backup_file, "wb") as f:
-                f.write(encrypted)
-            
-            # Nettoyer
-            os.remove(temp_file)
-            
-            # Enregistrer dans la base
-            size = os.path.getsize(backup_file)
-            self.db_handler.execute_query(
-                "INSERT INTO backups (filename, size, status) VALUES (?, ?, ?)",
-                (backup_file, size, 'active')
-            )
-            
-            # Nettoyer les vieilles sauvegardes
-            self._clean_old_backups(backup_dir)
-            
-            log_action("Sauvegarde", f"Sauvegarde créée: {backup_file}")
-            return True, backup_file
-            
-        except Exception as e:
-            log_action("Erreur sauvegarde", str(e), level="error")
-            return False, str(e)
-    
-    def restore_backup(self, backup_file):
-        """Restaure une sauvegarde"""
-        try:
-            if not os.path.exists(backup_file):
-                return False, "Fichier de sauvegarde introuvable"
-            
-            # Déchiffrer
-            fernet = Fernet(self.backup_key)
-            with open(backup_file, "rb") as f:
-                encrypted = f.read()
-            
-            decrypted = fernet.decrypt(encrypted)
-            
-            # Sauvegarder l'actuelle avant restauration
-            self.create_backup("Avant restauration")
-            
-            # Restaurer
-            temp_file = backup_file.replace('.enc', '_restore.db')
-            with open(temp_file, "wb") as f:
-                f.write(decrypted)
-            
-            shutil.copy2(temp_file, self.db_file)
-            os.remove(temp_file)
-            
-            log_action("Restauration", f"Base restaurée depuis: {backup_file}")
-            return True, "Restauration réussie"
-            
-        except Exception as e:
-            log_action("Erreur restauration", str(e), level="error")
-            return False, str(e)
-    
-    def _clean_old_backups(self, backup_dir, keep=10):
-        """Garde seulement les N dernières sauvegardes"""
-        try:
-            backups = sorted(
-                [os.path.join(backup_dir, f) for f in os.listdir(backup_dir) 
-                 if f.startswith("backup_") and f.endswith(".enc")],
-                key=os.path.getmtime
-            )
-            
-            for old_backup in backups[:-keep]:
-                os.remove(old_backup)
-                
-                # Mettre à jour le statut dans la base
-                self.db_handler.execute_query(
-                    "UPDATE backups SET status='deleted' WHERE filename=?",
-                    (old_backup,)
-                )
-                
-        except Exception as e:
-            log_action("Erreur nettoyage", str(e), level="warning")
-
-# ======================== GESTIONNAIRE DE NOTIFICATIONS ========================
-class NotificationManager:
-    """Gestionnaire de notifications par email"""
-    
-    def __init__(self, config=None):
-        self.config = config or {
-            'smtp_server': 'smtp.gmail.com',
-            'smtp_port': 587,
-            'email_from': 'notifications@agc-vie.com',
-            'email_to': ['admin@agc-vie.com'],
-            'username': None,
-            'password': None,
-            'use_tls': True
-        }
-    
-    def send_email(self, subject, body, recipients=None):
-        """Envoie un email"""
-        try:
-            if not self.config['username'] or not self.config['password']:
-                return False, "Configuration email incomplète"
-            
-            msg = MIMEMultipart()
-            msg['From'] = self.config['email_from']
-            msg['To'] = ', '.join(recipients or self.config['email_to'])
-            msg['Subject'] = subject
-            
-            msg.attach(MIMEText(body, 'plain'))
-            
-            with smtplib.SMTP(self.config['smtp_server'], self.config['smtp_port']) as server:
-                if self.config['use_tls']:
-                    server.starttls()
-                
-                server.login(self.config['username'], self.config['password'])
-                server.send_message(msg)
-            
-            log_action("Email envoyé", f"Sujet: {subject}")
-            return True, "Email envoyé avec succès"
-            
-        except Exception as e:
-            log_action("Erreur email", str(e), level="error")
-            return False, str(e)
-    
-    def send_alert(self, alert_type, details):
-        """Envoie une alerte"""
-        subject = f"ALERTE {alert_type} - AGC-VIE"
-        
-        body = f"""
-        Type d'alerte: {alert_type}
-        Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-        Détails: {details}
-        
-        Ceci est un message automatique du système AGC-VIE.
-        """
-        
-        return self.send_email(subject, body)
-    
-    def send_report(self, report_data, report_type="quotidien"):
-        """Envoie un rapport"""
-        subject = f"Rapport {report_type} - AGC-VIE"
-        
-        body = f"""
-        Rapport {report_type}
-        Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-        
-        Résumé:
-        {report_data}
-        
-        Pour plus de détails, connectez-vous à l'application.
-        """
-        
-        return self.send_email(subject, body)
-
-# ======================== FONCTIONS DE LOGGING ========================
-def log_action(action, details="", level="info"):
-    """Enregistre une action dans les logs"""
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    log_entry = {
-        'timestamp': timestamp,
-        'username': st.session_state.username if st.session_state.authenticated else "anonymous",
-        'action': action,
-        'details': details,
-        'level': level
-    }
-    
-    st.session_state.logs.append(log_entry)
-    
-    # Garder seulement les 1000 derniers logs
-    if len(st.session_state.logs) > 1000:
-        st.session_state.logs = st.session_state.logs[-1000:]
-    
-    # Logger dans un fichier
-    try:
-        logging.basicConfig(
-            filename='agc_vie.log',
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s'
-        )
-        
-        if level == "info":
-            logging.info(f"{action} - {details}")
-        elif level == "warning":
-            logging.warning(f"{action} - {details}")
-        elif level == "error":
-            logging.error(f"{action} - {details}")
-            
-    except Exception as e:
-        print(f"Erreur d'écriture des logs: {e}")
-
-def log_history(action_type, target_user=None, details="", data=None):
-    """Enregistre dans l'historique"""
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    history_entry = {
-        'timestamp': timestamp,
-        'username': st.session_state.username if st.session_state.authenticated else "system",
-        'action_type': action_type,
-        'target_user': target_user,
-        'details': details,
-        'data': data
-    }
-    
-    st.session_state.history.append(history_entry)
-    
-    # Garder seulement les 500 derniers historiques
-    if len(st.session_state.history) > 500:
-        st.session_state.history = st.session_state.history[-500:]
+        conn = sqlite3.connect(self.db_file)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
 
 # ======================== FONCTIONS D'AUTHENTIFICATION ========================
 def login(username, password):
@@ -1304,7 +734,11 @@ def process_technique_data(df):
         if not value_cols:
             value_cols = df.select_dtypes(include=[np.number]).columns.tolist()
         
-        if value_cols:
+        if value_cols and index_col in df.columns:
+            # Convertir les colonnes numériques
+            for col in value_cols:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            
             pivot_df = pd.pivot_table(
                 df,
                 index=[index_col],
@@ -1336,11 +770,17 @@ def process_comptable_data(df):
         if 'No Police' in df.columns:
             df['No Police'] = df['No Police'].astype(str).str.replace('.0', '', regex=False)
         
+        # Conversion numérique
+        numeric_cols = ['Débit', 'Crédit', 'Montant']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        
         # Tableau croisé dynamique
         index_col = 'No Police' if 'No Police' in df.columns else df.columns[0]
         value_cols = df.select_dtypes(include=[np.number]).columns.tolist()
         
-        if value_cols:
+        if value_cols and index_col in df.columns:
             pivot_df = pd.pivot_table(
                 df,
                 index=[index_col],
@@ -1402,21 +842,29 @@ def rapprochement_technique_comptable(tech_df, compta_df):
         compta_col = 'No Police' if 'No Police' in compta.columns else compta.columns[0]
         
         # Renommer pour la fusion
-        tech = tech.rename(columns={tech_col: 'Police'})
-        compta = compta.rename(columns={compta_col: 'Police'})
+        tech_renamed = tech.rename(columns={tech_col: 'Police'})
+        compta_renamed = compta.rename(columns={compta_col: 'Police'})
+        
+        # Conversion numérique
+        for col in ['Emissions', 'Ristournes', 'Débit', 'Crédit']:
+            if col in tech_renamed.columns:
+                tech_renamed[col] = pd.to_numeric(tech_renamed[col], errors='coerce').fillna(0)
+            if col in compta_renamed.columns:
+                compta_renamed[col] = pd.to_numeric(compta_renamed[col], errors='coerce').fillna(0)
         
         # Fusion
-        merged = pd.merge(tech, compta, on='Police', how='outer', suffixes=('_tech', '_compta'))
+        merged = pd.merge(
+            tech_renamed, 
+            compta_renamed, 
+            on='Police', 
+            how='outer', 
+            suffixes=('_tech', '_compta')
+        )
         
         # Calcul des écarts
-        if 'Emissions' in merged.columns and 'Débit' in merged.columns and 'Crédit' in merged.columns:
-            # Conversion en numérique
-            for col in ['Emissions', 'Débit', 'Crédit']:
-                if col in merged.columns:
-                    merged[col] = pd.to_numeric(merged[col], errors='coerce').fillna(0)
-            
-            merged['CA_Technique'] = merged['Emissions']
-            merged['CA_Comptable'] = abs(merged['Crédit'] - merged['Débit'])
+        if 'Emissions_tech' in merged.columns and 'Débit_compta' in merged.columns and 'Crédit_compta' in merged.columns:
+            merged['CA_Technique'] = merged['Emissions_tech']
+            merged['CA_Comptable'] = abs(merged['Crédit_compta'] - merged['Débit_compta'])
             merged['Écart'] = merged['CA_Technique'] - merged['CA_Comptable']
             merged['Statut'] = merged['Écart'].apply(
                 lambda x: 'Rapproché' if abs(x) < 0.01 else 'Non rapproché'
@@ -1425,11 +873,11 @@ def rapprochement_technique_comptable(tech_df, compta_df):
         # Statistiques
         stats = {
             'total_polices': len(merged),
-            'polices_techniques': len(tech),
-            'polices_comptables': len(compta),
-            'polices_communes': len(merged[merged['Police'].notna() & merged['Police_tech'].notna() & merged['Police_compta'].notna()]),
-            'polices_tech_only': len(merged[merged['Police_tech'].notna() & merged['Police_compta'].isna()]),
-            'polices_compta_only': len(merged[merged['Police_tech'].isna() & merged['Police_compta'].notna()])
+            'polices_techniques': len(tech_renamed),
+            'polices_comptables': len(compta_renamed),
+            'polices_communes': len(merged[merged['Police'].notna() & merged['Emissions_tech'].notna() & merged['Débit_compta'].notna()]),
+            'polices_tech_only': len(merged[merged['Emissions_tech'].notna() & merged['Débit_compta'].isna()]),
+            'polices_compta_only': len(merged[merged['Emissions_tech'].isna() & merged['Débit_compta'].notna()])
         }
         
         if 'Statut' in merged.columns:
@@ -1484,7 +932,9 @@ def export_to_excel(dataframes, sheet_names, filename="export.xlsx"):
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             for df, sheet_name in zip(dataframes, sheet_names):
                 if df is not None and not df.empty:
-                    df.to_excel(writer, sheet_name=sheet_name[:31], index=False)  # Excel limite à 31 caractères
+                    # Limiter le nom de la feuille à 31 caractères
+                    safe_name = sheet_name[:31]
+                    df.to_excel(writer, sheet_name=safe_name, index=False)
         
         output.seek(0)
         
@@ -1648,19 +1098,11 @@ def page_login():
                 help="Votre mot de passe sécurisé"
             )
             
-            role = st.selectbox(
-                "🎭 Rôle",
-                ["user", "admin"],
-                help="Sélectionnez votre rôle"
+            submitted = st.form_submit_button(
+                "Se connecter",
+                use_container_width=True,
+                type="primary"
             )
-            
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col2:
-                submitted = st.form_submit_button(
-                    "Se connecter",
-                    use_container_width=True,
-                    type="primary"
-                )
             
             if submitted:
                 if username and password:
@@ -1669,15 +1111,11 @@ def page_login():
                         st.balloons()
                         time.sleep(1)
                         st.rerun()
-                    else:
-                        st.error("Nom d'utilisateur ou mot de passe incorrect")
                 else:
                     st.warning("Veuillez remplir tous les champs")
         
-        # Informations supplémentaires
-
         st.markdown("""
-        <div style="text-align: center; color: #666; font-size: 0.9em;">
+        <div style="text-align: center; color: #666; font-size: 0.9em; margin-top: 20px;">
             <p>Compte démo: admin / Admin123!</p>
             <p>© 2025 AGC-VIE - Tous droits réservés</p>
         </div>
@@ -1688,9 +1126,9 @@ def page_accueil():
     update_last_activity()
     
     st.markdown("""
-    <div class="content-card fade-in" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-        <h1 style="color: white; text-align: center;">Bienvenue sur AGC-VIE</h1>
-        <p style="color: white; text-align: center; font-size: 1.2em;">
+    <div class="content-card fade-in" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); text-align: center;">
+        <h1 style="color: white;">Bienvenue sur AGC-VIE</h1>
+        <p style="color: white; font-size: 1.2em;">
             Système intégré de Gestion Technique et Comptable
         </p>
     </div>
@@ -1704,7 +1142,6 @@ def page_accueil():
         st.metric(
             "📊 Données techniques",
             tech_count,
-            delta=None,
             help="Nombre d'enregistrements techniques"
         )
     
@@ -1713,7 +1150,6 @@ def page_accueil():
         st.metric(
             "💰 Données comptables",
             compta_count,
-            delta=None,
             help="Nombre d'enregistrements comptables"
         )
     
@@ -1723,7 +1159,6 @@ def page_accueil():
             st.metric(
                 "📈 CA Technique",
                 f"{ca_tech:,.0f} FCFA",
-                delta=None,
                 help="Chiffre d'affaires technique"
             )
     
@@ -1733,93 +1168,71 @@ def page_accueil():
             st.metric(
                 "📉 CA Comptable",
                 f"{ca_compta:,.0f} FCFA",
-                delta=None,
                 help="Chiffre d'affaires comptable"
             )
     
-    # Modules
+    # Modules disponibles
     st.markdown("## 🚀 Modules disponibles")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        with st.container():
-            st.markdown("""
-            <div class="content-card">
-                <h3>📊 Gestion Technique</h3>
-                <p>Import, analyse et traitement des données techniques</p>
-                <ul>
-                    <li>Import de fichiers Excel/CSV</li>
-                    <li>Traitement des polices</li>
-                    <li>Calcul des émissions et ristournes</li>
-                    <li>Export des données</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown("""
+        <div class="content-card">
+            <h3>📊 Gestion Technique</h3>
+            <p>Import, analyse et traitement des données techniques</p>
+            <ul>
+                <li>Import de fichiers Excel/CSV</li>
+                <li>Traitement des polices</li>
+                <li>Calcul des émissions et ristournes</li>
+                <li>Export des données</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col2:
-        with st.container():
-            st.markdown("""
-            <div class="content-card">
-                <h3>💰 Gestion Comptable</h3>
-                <p>Gestion des données comptables et rapprochements</p>
-                <ul>
-                    <li>Import des écritures comptables</li>
-                    <li>Analyse des débits/crédits</li>
-                    <li>Tableaux croisés dynamiques</li>
-                    <li>Export des résultats</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown("""
+        <div class="content-card">
+            <h3>💰 Gestion Comptable</h3>
+            <p>Gestion des données comptables et rapprochements</p>
+            <ul>
+                <li>Import des écritures comptables</li>
+                <li>Analyse des débits/crédits</li>
+                <li>Tableaux croisés dynamiques</li>
+                <li>Export des résultats</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
     
     with col1:
-        with st.container():
-            st.markdown("""
-            <div class="content-card">
-                <h3>🔄 Rapprochement Technique</h3>
-                <p>Rapprochement entre données techniques et comptables</p>
-                <ul>
-                    <li>Comparaison automatique</li>
-                    <li>Détection des écarts</li>
-                    <li>Visualisation des résultats</li>
-                    <li>Export des rapprochements</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown("""
+        <div class="content-card">
+            <h3>🔄 Rapprochement Technique</h3>
+            <p>Rapprochement entre données techniques et comptables</p>
+            <ul>
+                <li>Comparaison automatique</li>
+                <li>Détection des écarts</li>
+                <li>Visualisation des résultats</li>
+                <li>Export des rapprochements</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col2:
-        with st.container():
-            st.markdown("""
-            <div class="content-card">
-                <h3>📋 Gestion 410 & 411</h3>
-                <p>Gestion des comptes 410 et 411</p>
-                <ul>
-                    <li>Vérification des polices</li>
-                    <li>Détection des incohérences</li>
-                    <li>Validation des références</li>
-                    <li>Analyse comparative</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    # Dernières actions
-    if st.session_state.logs:
-        st.markdown("## 📋 Dernières activités")
-        
-        logs_df = pd.DataFrame(st.session_state.logs[-10:])
-        
-        # Formatage pour l'affichage
-        if 'timestamp' in logs_df.columns:
-            logs_df['timestamp'] = pd.to_datetime(logs_df['timestamp']).dt.strftime('%d/%m/%Y %H:%M')
-        
-        st.dataframe(
-            logs_df[['timestamp', 'action', 'details']],
-            use_container_width=True,
-            height=300,
-            hide_index=True
-        )
+        st.markdown("""
+        <div class="content-card">
+            <h3>📋 Gestion 410 & 411</h3>
+            <p>Gestion des comptes 410 et 411</p>
+            <ul>
+                <li>Vérification des polices</li>
+                <li>Détection des incohérences</li>
+                <li>Validation des références</li>
+                <li>Analyse comparative</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
 
 def page_gestion_technique():
     """Page de gestion technique"""
@@ -1869,6 +1282,7 @@ def page_gestion_technique():
                         with st.spinner("Traitement en cours..."):
                             pivot_df = process_technique_data(df)
                             st.session_state.pivot_techniques = pivot_df
+                            st.session_state.stats['total_imports'] += 1
                             
                             st.success(f"Traitement terminé! {len(pivot_df)} enregistrements générés.")
                             st.balloons()
@@ -2049,6 +1463,7 @@ def page_gestion_comptable():
                         with st.spinner("Traitement en cours..."):
                             pivot_df = process_comptable_data(df)
                             st.session_state.pivot_comptables = pivot_df
+                            st.session_state.stats['total_imports'] += 1
                             
                             st.success(f"Traitement terminé! {len(pivot_df)} enregistrements générés.")
                             st.balloons()
@@ -2183,90 +1598,13 @@ def page_gestion_comptable():
                     with col2:
                         st.metric("Total Crédit", f"{total_credit:,.0f} FCFA")
                     with col3:
-                        delta_color = "normal" if solde >= 0 else "inverse"
-                        st.metric("Solde", f"{solde:,.0f} FCFA", delta=f"{abs(solde):,.0f}", delta_color=delta_color)
+                        st.metric("Solde", f"{solde:,.0f} FCFA")
                 
             else:
                 st.warning("Aucune colonne numérique disponible pour l'analyse")
         else:
             st.info("Aucune donnée à analyser")
-            
-            
-def rapprochement_technique_comptable(tech_df, compta_df):
-    """Effectue le rapprochement entre données techniques et comptables"""
-    try:
-        # Copie des DataFrames
-        tech = tech_df.copy()
-        compta = compta_df.copy()
-        
-        # Déterminer les colonnes de jointure
-        tech_col = 'Nouvelle_Police' if 'Nouvelle_Police' in tech.columns else tech.columns[0]
-        compta_col = 'No Police' if 'No Police' in compta.columns else compta.columns[0]
-        
-        # Renommer pour la fusion
-        tech_renamed = tech.rename(columns={tech_col: 'Police'})
-        compta_renamed = compta.rename(columns={compta_col: 'Police'})
-        
-        # Fusion - Utiliser 'Police' comme clé commune après renommage
-        merged = pd.merge(
-            tech_renamed, 
-            compta_renamed, 
-            on='Police', 
-            how='outer', 
-            suffixes=('_tech', '_compta')
-        )
-        
-        # Calcul des écarts
-        if 'Emissions' in merged.columns and 'Débit' in merged.columns and 'Crédit' in merged.columns:
-            # Conversion en numérique
-            for col in ['Emissions', 'Débit', 'Crédit']:
-                if col in merged.columns:
-                    merged[col] = pd.to_numeric(merged[col], errors='coerce').fillna(0)
-            
-            # Créer les colonnes CA si elles n'existent pas
-            if 'CA_Technique' not in merged.columns:
-                merged['CA_Technique'] = merged['Emissions']
-            
-            if 'CA_Comptable' not in merged.columns:
-                merged['CA_Comptable'] = abs(merged['Crédit'] - merged['Débit'])
-            
-            if 'Écart' not in merged.columns:
-                merged['Écart'] = merged['CA_Technique'] - merged['CA_Comptable']
-            
-            if 'Statut' not in merged.columns:
-                merged['Statut'] = merged['Écart'].apply(
-                    lambda x: 'Rapproché' if abs(x) < 0.01 else 'Non rapproché'
-                )
-        
-        # Statistiques - Correction pour utiliser les bonnes colonnes
-        stats = {
-            'total_polices': len(merged),
-            'polices_techniques': len(tech),
-            'polices_comptables': len(compta),
-            'polices_communes': len(merged[merged['Police_tech'].notna() & merged['Police_compta'].notna()]) 
-                               if 'Police_tech' in merged.columns and 'Police_compta' in merged.columns 
-                               else len(merged[merged['Police'].notna()]),
-            'polices_tech_only': len(merged[merged['Police_tech'].notna() & merged['Police_compta'].isna()]) 
-                               if 'Police_tech' in merged.columns and 'Police_compta' in merged.columns 
-                               else len(merged[merged['Police'].notna() & merged['Emissions'].notna() & merged['Débit'].isna()]),
-            'polices_compta_only': len(merged[merged['Police_tech'].isna() & merged['Police_compta'].notna()]) 
-                                 if 'Police_tech' in merged.columns and 'Police_compta' in merged.columns 
-                                 else len(merged[merged['Police'].notna() & merged['Emissions'].isna() & merged['Débit'].notna()])
-        }
-        
-        if 'Statut' in merged.columns:
-            stats['rapprochees'] = len(merged[merged['Statut'] == 'Rapproché'])
-            stats['non_rapprochees'] = len(merged[merged['Statut'] == 'Non rapproché'])
-            stats['ecart_total'] = merged['Écart'].sum()
-        
-        log_action("Rapprochement", f"{stats['polices_communes']} polices communes")
-        return merged, stats
-        
-    except Exception as e:
-        log_action("Erreur rapprochement", str(e), level="error")
-        return None, str(e)
-    
-    
+
 def page_rapprochement_technique():
     """Page de rapprochement technique"""
     update_last_activity()
@@ -2276,16 +1614,10 @@ def page_rapprochement_technique():
     # Vérification des données
     if st.session_state.pivot_techniques is None:
         st.warning("⚠️ Données techniques manquantes. Veuillez d'abord importer les données techniques.")
-        if st.button("📥 Aller à la gestion technique"):
-            st.session_state.page = "Gestion Technique"
-            st.rerun()
         return
     
     if st.session_state.pivot_comptables is None:
         st.warning("⚠️ Données comptables manquantes. Veuillez d'abord importer les données comptables.")
-        if st.button("💰 Aller à la gestion comptable"):
-            st.session_state.page = "Gestion Comptable"
-            st.rerun()
         return
     
     # Effectuer le rapprochement
@@ -2296,6 +1628,8 @@ def page_rapprochement_technique():
         )
     
     if merged_df is not None:
+        st.session_state.stats['total_verifications'] += 1
+        
         # Métriques
         st.markdown("### 📊 Résumé du rapprochement")
         
@@ -2305,24 +1639,21 @@ def page_rapprochement_technique():
             display_metric_card(
                 "Polices techniques",
                 stats.get('polices_techniques', 0),
-                "📊",
-                f"Total: {stats.get('polices_techniques', 0)}"
+                "📊"
             )
         
         with col2:
             display_metric_card(
                 "Polices comptables",
                 stats.get('polices_comptables', 0),
-                "💰",
-                f"Total: {stats.get('polices_comptables', 0)}"
+                "💰"
             )
         
         with col3:
             display_metric_card(
                 "Polices communes",
                 stats.get('polices_communes', 0),
-                "🔄",
-                f"Taux: {stats.get('polices_communes', 0)/stats.get('polices_techniques', 1)*100:.1f}%"
+                "🔄"
             )
         
         with col4:
@@ -2330,8 +1661,7 @@ def page_rapprochement_technique():
             display_metric_card(
                 "Écart total",
                 f"{ecart:,.0f} FCFA",
-                "📈" if ecart >= 0 else "📉",
-                "Positif si CA technique > CA comptable"
+                "📈" if ecart >= 0 else "📉"
             )
         
         # Tabs pour les différentes vues
@@ -2416,35 +1746,11 @@ def page_rapprochement_technique():
                 fig.update_layout(height=400)
                 st.plotly_chart(fig, use_container_width=True)
         
-        # Top des écarts
-        if 'Écart' in merged_df.columns:
-            st.markdown("### 📈 Top 10 des écarts")
-            
-            top_ecarts = merged_df.nlargest(10, 'Écart')[['Police', 'CA_Technique', 'CA_Comptable', 'Écart']]
-            st.dataframe(top_ecarts, use_container_width=True, hide_index=True)
-        
-        # Export complet
-        st.markdown("### 📥 Export du rapprochement")
-        
-        if st.button("📥 Exporter le rapport complet", type="primary", use_container_width=True):
-            output = export_to_excel(
-                [merged_df],
-                ["Rapprochement"],
-                "rapprochement_technique_complet.xlsx"
-            )
-            if output:
-                create_download_button(
-                    output,
-                    "rapprochement_technique_complet.xlsx",
-                    "Télécharger le rapport"
-                )
-        
         log_action("Rapprochement technique", f"{len(merged_df)} polices analysées")
         
     else:
         st.error(f"Erreur lors du rapprochement: {stats}")
-        
-        
+
 def page_rapprochement_comptable():
     """Page de rapprochement comptable"""
     update_last_activity()
@@ -2454,133 +1760,93 @@ def page_rapprochement_comptable():
     # Vérification des données
     if st.session_state.pivot_techniques is None:
         st.warning("⚠️ Données techniques manquantes. Veuillez d'abord importer les données techniques.")
-        if st.button("📥 Aller à la gestion technique"):
-            st.session_state.page = "Gestion Technique"
-            st.rerun()
         return
     
     if st.session_state.pivot_comptables is None:
         st.warning("⚠️ Données comptables manquantes. Veuillez d'abord importer les données comptables.")
-        if st.button("💰 Aller à la gestion comptable"):
-            st.session_state.page = "Gestion Comptable"
-            st.rerun()
         return
     
     with st.spinner("Calcul du rapprochement comptable en cours..."):
-        # Fonction pour récupérer les annulations et émissions dans les données techniques
-        def recuperer_annulations_emissions(pivot_techniques, pivot_comptables):
-            """Ajoute les colonnes Ristournes et Emissions aux données comptables"""
-            try:
-                # Copie pour éviter les modifications sur l'original
-                df_compta = pivot_comptables.copy()
-                df_tech = pivot_techniques.copy()
+        try:
+            # Récupérer les données
+            df_tech = st.session_state.pivot_techniques.copy()
+            df_compta = st.session_state.pivot_comptables.copy()
+            
+            # Déterminer les colonnes de police
+            tech_col = 'Nouvelle_Police' if 'Nouvelle_Police' in df_tech.columns else df_tech.columns[0]
+            compta_col = 'No Police' if 'No Police' in df_compta.columns else df_compta.columns[0]
+            
+            # Ajouter les colonnes techniques aux données comptables
+            df_compta['Ristournes'] = 0
+            df_compta['Emissions'] = 0
+            df_compta['Statut_Ristournes'] = 'Non trouvé'
+            df_compta['Statut_Emissions'] = 'Non trouvé'
+            
+            # Pour chaque ligne comptable, chercher la correspondance
+            for index, row in df_compta.iterrows():
+                police_compta = str(row[compta_col]).strip()
                 
-                # Nettoyage des noms de colonnes
-                df_compta.columns = df_compta.columns.str.strip()
-                df_tech.columns = df_tech.columns.str.strip()
+                correspondance = df_tech[df_tech[tech_col].astype(str).str.strip() == police_compta]
                 
-                # Déterminer les colonnes de police
-                tech_col = 'Nouvelle_Police' if 'Nouvelle_Police' in df_tech.columns else df_tech.columns[0]
-                compta_col = 'No Police' if 'No Police' in df_compta.columns else df_compta.columns[0]
-                
-                # Initialiser les colonnes
-                df_compta['Ristournes'] = 0
-                df_compta['Emissions'] = 0
-                df_compta['Statut_Ristournes'] = 'Non trouvé'
-                df_compta['Statut_Emissions'] = 'Non trouvé'
-                
-                # Pour chaque ligne comptable, chercher la correspondance dans les données techniques
-                for index, row in df_compta.iterrows():
-                    police_compta = str(row[compta_col]).strip()
+                if not correspondance.empty:
+                    if 'Ristournes' in correspondance.columns:
+                        df_compta.at[index, 'Ristournes'] = pd.to_numeric(correspondance['Ristournes'].values[0], errors='coerce')
+                        df_compta.at[index, 'Statut_Ristournes'] = 'Trouvé'
                     
-                    # Chercher dans les données techniques
-                    correspondance = df_tech[df_tech[tech_col].astype(str).str.strip() == police_compta]
-                    
-                    if not correspondance.empty:
-                        # Récupérer les valeurs techniques
-                        if 'Ristournes' in correspondance.columns:
-                            df_compta.at[index, 'Ristournes'] = correspondance['Ristournes'].values[0]
-                            df_compta.at[index, 'Statut_Ristournes'] = 'Trouvé'
-                        
-                        if 'Emissions' in correspondance.columns:
-                            df_compta.at[index, 'Emissions'] = correspondance['Emissions'].values[0]
-                            df_compta.at[index, 'Statut_Emissions'] = 'Trouvé'
+                    if 'Emissions' in correspondance.columns:
+                        df_compta.at[index, 'Emissions'] = pd.to_numeric(correspondance['Emissions'].values[0], errors='coerce')
+                        df_compta.at[index, 'Statut_Emissions'] = 'Trouvé'
+            
+            # Conversion en numérique
+            for col in ['Crédit', 'Débit', 'Emissions', 'Ristournes']:
+                if col in df_compta.columns:
+                    df_compta[col] = pd.to_numeric(df_compta[col], errors='coerce').fillna(0)
+            
+            # Calcul du rapprochement
+            if all(col in df_compta.columns for col in ['Crédit', 'Débit', 'Emissions', 'Ristournes']):
+                df_compta['CA_Comptable'] = df_compta['Crédit'] - df_compta['Débit']
+                df_compta['CA_Technique'] = df_compta['Emissions'] + df_compta['Ristournes']
+                df_compta['Écart'] = abs(df_compta['CA_Comptable']) - abs(df_compta['CA_Technique'])
                 
-                return df_compta
-                
-            except Exception as e:
-                st.error(f"Erreur dans recuperer_annulations_emissions: {str(e)}")
-                return pivot_comptables
-        
-        # Fonction pour vérifier les polices comptables
-        def verifier_polices_comptable(pivot_comptables):
-            """Vérifie le rapprochement des polices comptables"""
-            try:
-                df = pivot_comptables.copy()
-                
-                # Conversion en numérique
-                for col in ['Crédit', 'Débit', 'Emissions', 'Ristournes']:
-                    if col in df.columns:
-                        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-                
-                # Calcul du rapprochement
-                if all(col in df.columns for col in ['Crédit', 'Débit', 'Emissions', 'Ristournes']):
-                    df['CA_Comptable'] = df['Crédit'] - df['Débit']
-                    df['CA_Technique'] = df['Emissions'] + df['Ristournes']
-                    df['Écart'] = abs(df['CA_Comptable']) - abs(df['CA_Technique'])
-                    
-                    df['Rapprochement'] = df.apply(
-                        lambda row: 'Rapproché' if abs(row['Écart']) < 0.01 else 'Non rapproché', 
-                        axis=1
-                    )
-                
-                # Calcul des totaux
-                total_debit = df['Débit'].sum() if 'Débit' in df.columns else 0
-                total_credit = df['Crédit'].sum() if 'Crédit' in df.columns else 0
-                total_emissions_tech = df['Emissions'].sum() if 'Emissions' in df.columns else 0
-                total_ristournes_tech = df['Ristournes'].sum() if 'Ristournes' in df.columns else 0
-                total_CA_comptable = abs(total_credit - total_debit)
-                total_CA_technique = abs(total_emissions_tech + total_ristournes_tech)
-                ecart = abs(total_CA_technique - total_CA_comptable)
-                
-                # Tableaux de résultats
-                tableau_invalide = df[df['Rapprochement'] == 'Non rapproché'] if 'Rapprochement' in df.columns else pd.DataFrame()
-                tableau_valide = df[df['Rapprochement'] == 'Rapproché'] if 'Rapprochement' in df.columns else pd.DataFrame()
-                
-                stats = {
-                    'total_debit': total_debit,
-                    'total_credit': total_credit,
-                    'total_CA_comptable': total_CA_comptable,
-                    'total_emissions_tech': total_emissions_tech,
-                    'total_ristournes_tech': total_ristournes_tech,
-                    'total_CA_technique': total_CA_technique,
-                    'ecart': ecart,
-                    'total_polices': len(df),
-                    'polices_valides': len(tableau_valide),
-                    'polices_invalides': len(tableau_invalide)
-                }
-                
-                return df, tableau_invalide, tableau_valide, stats
-                
-            except Exception as e:
-                st.error(f"Erreur dans verifier_polices_comptable: {str(e)}")
-                return pivot_comptables, pd.DataFrame(), pd.DataFrame(), {}
-        
-        # Exécution du rapprochement
-        pivot_comptables_avec_tech = recuperer_annulations_emissions(
-            st.session_state.pivot_techniques,
-            st.session_state.pivot_comptables
-        )
-        
-        df_complet, df_invalide, df_valide, stats = verifier_polices_comptable(pivot_comptables_avec_tech)
-        
-        # Stockage dans la session
-        st.session_state.pivot_comptables_complet = df_complet
-        st.session_state.tableau_listing_police_invalide_comptable = df_invalide
-        st.session_state.tableau_listing_valide_comptable = df_valide
+                df_compta['Rapprochement'] = df_compta.apply(
+                    lambda row: 'Rapproché' if abs(row['Écart']) < 0.01 else 'Non rapproché', 
+                    axis=1
+                )
+            
+            # Séparer valides et invalides
+            df_invalide = df_compta[df_compta['Rapprochement'] == 'Non rapproché'] if 'Rapprochement' in df_compta.columns else pd.DataFrame()
+            df_valide = df_compta[df_compta['Rapprochement'] == 'Rapproché'] if 'Rapprochement' in df_compta.columns else pd.DataFrame()
+            
+            # Statistiques
+            stats = {
+                'total_debit': df_compta['Débit'].sum() if 'Débit' in df_compta.columns else 0,
+                'total_credit': df_compta['Crédit'].sum() if 'Crédit' in df_compta.columns else 0,
+                'total_CA_comptable': abs(df_compta['Crédit'].sum() - df_compta['Débit'].sum()) if 'Débit' in df_compta.columns and 'Crédit' in df_compta.columns else 0,
+                'total_emissions_tech': df_compta['Emissions'].sum() if 'Emissions' in df_compta.columns else 0,
+                'total_ristournes_tech': df_compta['Ristournes'].sum() if 'Ristournes' in df_compta.columns else 0,
+                'total_CA_technique': abs(df_compta['Emissions'].sum() + df_compta['Ristournes'].sum()) if 'Emissions' in df_compta.columns and 'Ristournes' in df_compta.columns else 0,
+                'ecart': abs(abs(df_compta['Emissions'].sum() + df_compta['Ristournes'].sum()) - abs(df_compta['Crédit'].sum() - df_compta['Débit'].sum())) if all(col in df_compta.columns for col in ['Emissions', 'Ristournes', 'Crédit', 'Débit']) else 0,
+                'total_polices': len(df_compta),
+                'polices_valides': len(df_valide),
+                'polices_invalides': len(df_invalide)
+            }
+            
+            # Stockage dans la session
+            st.session_state.pivot_comptables_complet = df_compta
+            st.session_state.tableau_listing_police_invalide_comptable = df_invalide
+            st.session_state.tableau_listing_valide_comptable = df_valide
+            
+            log_action("Rapprochement comptable", f"{len(df_compta)} polices analysées")
+            
+        except Exception as e:
+            st.error(f"Erreur lors du rapprochement: {str(e)}")
+            log_action("Erreur rapprochement comptable", str(e), level="error")
+            return
     
     # Affichage des résultats
     if stats:
+        st.session_state.stats['total_verifications'] += 1
+        
         # Métriques principales
         st.markdown("### 📊 Résumé du rapprochement comptable")
         
@@ -2590,32 +1856,28 @@ def page_rapprochement_comptable():
             display_metric_card(
                 "Total Débit",
                 f"{stats.get('total_debit', 0):,.0f} FCFA",
-                "💳",
-                "Somme des débits"
+                "💳"
             )
         
         with col2:
             display_metric_card(
                 "Total Crédit",
                 f"{stats.get('total_credit', 0):,.0f} FCFA",
-                "💰",
-                "Somme des crédits"
+                "💰"
             )
         
         with col3:
             display_metric_card(
                 "CA Comptable",
                 f"{stats.get('total_CA_comptable', 0):,.0f} FCFA",
-                "📊",
-                "Crédit - Débit"
+                "📊"
             )
         
         with col4:
             display_metric_card(
                 "CA Technique",
                 f"{stats.get('total_CA_technique', 0):,.0f} FCFA",
-                "📈",
-                "Émissions + Ristournes"
+                "📈"
             )
         
         # Deuxième ligne de métriques
@@ -2625,22 +1887,19 @@ def page_rapprochement_comptable():
             display_metric_card(
                 "Écart",
                 f"{stats.get('ecart', 0):,.0f} FCFA",
-                "📉" if stats.get('ecart', 0) > 0 else "📈",
-                "CA Technique - CA Comptable"
+                "📉" if stats.get('ecart', 0) > 0 else "📈"
             )
         
         with col2:
-            total_polices = stats.get('total_polices', 0)
             display_metric_card(
                 "Total polices",
-                total_polices,
-                "📋",
-                f"Nombre total de polices"
+                stats.get('total_polices', 0),
+                "📋"
             )
         
         with col3:
             valides = stats.get('polices_valides', 0)
-            taux_valides = (valides / total_polices * 100) if total_polices > 0 else 0
+            taux_valides = (valides / stats.get('total_polices', 1) * 100) if stats.get('total_polices', 0) > 0 else 0
             display_metric_card(
                 "Polices rapprochées",
                 valides,
@@ -2650,7 +1909,7 @@ def page_rapprochement_comptable():
         
         with col4:
             invalides = stats.get('polices_invalides', 0)
-            taux_invalides = (invalides / total_polices * 100) if total_polices > 0 else 0
+            taux_invalides = (invalides / stats.get('total_polices', 1) * 100) if stats.get('total_polices', 0) > 0 else 0
             display_metric_card(
                 "Polices non rapprochées",
                 invalides,
@@ -2667,17 +1926,17 @@ def page_rapprochement_comptable():
             # Recherche
             search = create_search_bar("compta_rapprochement_search", "Rechercher une police...")
             
-            df_display = df_complet.copy()
+            df_display = st.session_state.pivot_comptables_complet.copy()
             if search:
                 df_display = filter_dataframe(df_display, search)
             
             st.dataframe(df_display, use_container_width=True, height=500, hide_index=True)
         
         with tab2:
+            df_invalide = st.session_state.tableau_listing_police_invalide_comptable
             st.markdown(f"### Polices non rapprochées ({len(df_invalide)})")
             
             if not df_invalide.empty:
-                # Recherche dans les invalides
                 search_invalide = create_search_bar("invalide_search", "Rechercher dans les non rapprochées...")
                 
                 df_invalide_display = df_invalide.copy()
@@ -2686,40 +1945,26 @@ def page_rapprochement_comptable():
                 
                 st.dataframe(df_invalide_display, use_container_width=True, height=500, hide_index=True)
                 
-                # Export des non rapprochées
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    if st.button("📥 Exporter les non rapprochées (Excel)", use_container_width=True):
-                        output = export_to_excel(
-                            [df_invalide],
-                            ["Non rapprochées"],
-                            "polices_comptables_non_rapprochees.xlsx"
+                if st.button("📥 Exporter les non rapprochées", use_container_width=True):
+                    output = export_to_excel(
+                        [df_invalide],
+                        ["Non rapprochées"],
+                        "polices_comptables_non_rapprochees.xlsx"
+                    )
+                    if output:
+                        create_download_button(
+                            output,
+                            "polices_comptables_non_rapprochees.xlsx",
+                            "Télécharger Excel"
                         )
-                        if output:
-                            create_download_button(
-                                output,
-                                "polices_comptables_non_rapprochees.xlsx",
-                                "Télécharger Excel"
-                            )
-                
-                with col2:
-                    if st.button("📥 Exporter en CSV", use_container_width=True):
-                        csv_data = export_to_csv(df_invalide, "polices_comptables_non_rapprochees.csv")
-                        if csv_data:
-                            create_download_button(
-                                csv_data,
-                                "polices_comptables_non_rapprochees.csv",
-                                "Télécharger CSV"
-                            )
             else:
                 st.success("✅ Toutes les polices comptables sont rapprochées !")
         
         with tab3:
+            df_valide = st.session_state.tableau_listing_valide_comptable
             st.markdown(f"### Polices rapprochées ({len(df_valide)})")
             
             if not df_valide.empty:
-                # Recherche dans les valides
                 search_valide = create_search_bar("valide_search", "Rechercher dans les rapprochées...")
                 
                 df_valide_display = df_valide.copy()
@@ -2735,6 +1980,9 @@ def page_rapprochement_comptable():
         
         with col1:
             # Graphique de répartition des statuts
+            df_invalide = st.session_state.tableau_listing_police_invalide_comptable
+            df_valide = st.session_state.tableau_listing_valide_comptable
+            
             if not df_invalide.empty or not df_valide.empty:
                 fig = go.Figure(data=[
                     go.Pie(
@@ -2742,8 +1990,7 @@ def page_rapprochement_comptable():
                         values=[len(df_valide), len(df_invalide)],
                         marker_colors=['#28a745', '#dc3545'],
                         hole=0.3,
-                        textinfo='label+percent',
-                        hoverinfo='label+value+percent'
+                        textinfo='label+percent'
                     )
                 ])
                 
@@ -2777,116 +2024,7 @@ def page_rapprochement_comptable():
                 )
                 
                 st.plotly_chart(fig, use_container_width=True)
-        
-        # Analyse des écarts
-        st.markdown("### 📈 Analyse des écarts")
-        
-        if not df_invalide.empty and 'Écart' in df_invalide.columns:
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                # Distribution des écarts
-                fig = px.histogram(
-                    df_invalide,
-                    x='Écart',
-                    nbins=30,
-                    title="Distribution des écarts (polices non rapprochées)",
-                    color_discrete_sequence=['#dc3545']
-                )
-                fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
-                # Top 10 des écarts
-                st.markdown("#### Top 10 des écarts")
-                
-                ecarts_cols = ['No Police' if 'No Police' in df_invalide.columns else df_invalide.columns[0]]
-                if 'Écart' in df_invalide.columns:
-                    ecarts_cols.append('Écart')
-                if 'CA_Comptable' in df_invalide.columns:
-                    ecarts_cols.append('CA_Comptable')
-                if 'CA_Technique' in df_invalide.columns:
-                    ecarts_cols.append('CA_Technique')
-                
-                top_ecarts = df_invalide.nlargest(10, 'Écart')[ecarts_cols]
-                st.dataframe(top_ecarts, use_container_width=True, hide_index=True)
-        
-        # Export complet
-        st.markdown("### 📥 Export des résultats")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("📥 Exporter le rapport complet", type="primary", use_container_width=True):
-                # Créer un fichier Excel avec plusieurs onglets
-                dataframes = []
-                sheet_names = []
-                
-                if df_complet is not None:
-                    dataframes.append(df_complet)
-                    sheet_names.append("Données complètes")
-                
-                if df_valide is not None and not df_valide.empty:
-                    dataframes.append(df_valide)
-                    sheet_names.append("Polices rapprochées")
-                
-                if df_invalide is not None and not df_invalide.empty:
-                    dataframes.append(df_invalide)
-                    sheet_names.append("Polices non rapprochées")
-                
-                # Ajouter un résumé
-                resume_df = pd.DataFrame([
-                    ["Total Débit", f"{stats.get('total_debit', 0):,.0f} FCFA"],
-                    ["Total Crédit", f"{stats.get('total_credit', 0):,.0f} FCFA"],
-                    ["CA Comptable", f"{stats.get('total_CA_comptable', 0):,.0f} FCFA"],
-                    ["CA Technique", f"{stats.get('total_CA_technique', 0):,.0f} FCFA"],
-                    ["Écart", f"{stats.get('ecart', 0):,.0f} FCFA"],
-                    ["Total polices", stats.get('total_polices', 0)],
-                    ["Polices rapprochées", stats.get('polices_valides', 0)],
-                    ["Polices non rapprochées", stats.get('polices_invalides', 0)],
-                    ["Taux de rapprochement", f"{(stats.get('polices_valides', 0)/stats.get('total_polices', 1)*100):.1f}%"]
-                ], columns=["Indicateur", "Valeur"])
-                
-                dataframes.append(resume_df)
-                sheet_names.append("Résumé")
-                
-                output = export_to_excel(dataframes, sheet_names, "rapprochement_comptable_complet.xlsx")
-                if output:
-                    create_download_button(
-                        output,
-                        "rapprochement_comptable_complet.xlsx",
-                        "Télécharger le rapport Excel"
-                    )
-        
-        with col2:
-            if st.button("📊 Exporter les graphiques", use_container_width=True):
-                st.info("Fonctionnalité à venir: export des graphiques en PNG")
-        
-        with col3:
-            if st.button("📋 Générer un rapport PDF", use_container_width=True):
-                with st.spinner("Génération du rapport PDF..."):
-                    time.sleep(2)
-                    st.success("Rapport PDF généré avec succès!")
-                    
-                    # Simulation de téléchargement PDF
-                    st.download_button(
-                        label="📥 Télécharger le PDF",
-                        data=b"Simulation de rapport PDF",
-                        file_name="rapprochement_comptable.pdf",
-                        mime="application/pdf",
-                        use_container_width=True
-                    )
-        
-        # Journalisation
-        log_action(
-            "Rapprochement comptable", 
-            f"{len(df_complet)} polices analysées, {len(df_invalide)} non rapprochées, écart: {stats.get('ecart', 0):,.0f} FCFA"
-        )
-        
-    else:
-        st.error("Erreur lors du calcul des statistiques de rapprochement")
-        
-        
+
 def page_gestion_410_411():
     """Page de gestion 410 et 411"""
     update_last_activity()
@@ -2961,7 +2099,6 @@ def page_gestion_410_411():
             with col1:
                 if st.button("🔍 Vérifier polices 410/411", use_container_width=True):
                     with st.spinner("Vérification en cours..."):
-                        # Récupérer les polices
                         if 'No Police' in st.session_state.df_410.columns and 'No Police' in st.session_state.df_411.columns:
                             polices_410 = set(st.session_state.df_410['No Police'].dropna().astype(str))
                             polices_411 = set(st.session_state.df_411['No Police'].dropna().astype(str))
@@ -2984,6 +2121,7 @@ def page_gestion_410_411():
                                 with st.expander("Voir les polices"):
                                     st.dataframe(pd.DataFrame(sorted(only_410), columns=['Polices 410 uniquement']))
                             
+                            st.session_state.stats['total_verifications'] += 1
                             log_action("Vérification 410/411", f"{len(communes)} communes, {len(only_410)} uniquement 410")
             
             with col2:
@@ -3011,6 +2149,7 @@ def page_gestion_410_411():
                                 with st.expander("Voir les polices"):
                                     st.dataframe(pd.DataFrame(sorted(only_411), columns=['Polices 411 uniquement']))
                             
+                            st.session_state.stats['total_verifications'] += 1
                             log_action("Vérification 411/410", f"{len(communes)} communes, {len(only_411)} uniquement 411")
             
             with col3:
@@ -3035,7 +2174,6 @@ def page_gestion_410_411():
                                     with st.expander("Voir les références invalides"):
                                         st.dataframe(pd.DataFrame(invalid_refs, columns=['Références invalides']))
                                     
-                                    # Export
                                     if st.button("📥 Exporter les invalides"):
                                         df_invalid = pd.DataFrame(invalid_refs, columns=['Références invalides'])
                                         csv_data = export_to_csv(df_invalid, "references_invalides.csv")
@@ -3045,8 +2183,9 @@ def page_gestion_410_411():
                                                 "references_invalides.csv",
                                                 "Télécharger CSV"
                                             )
-                            
-                            log_action("Validation références", f"{stats['invalides']} invalides")
+                                
+                                st.session_state.stats['total_verifications'] += 1
+                                log_action("Validation références", f"{stats['invalides']} invalides")
         
         else:
             st.info("Veuillez importer les fichiers CP_410 et CP_411 pour effectuer les vérifications.")
@@ -3256,8 +2395,14 @@ def page_gestion_doublons():
                     
                     with col2:
                         # Histogramme des occurrences
-                        if 'NUMERO POLICE' in df.columns:
-                            occurrences = df['NUMERO POLICE'].value_counts().value_counts().sort_index()
+                        police_col = None
+                        for col in df.columns:
+                            if 'police' in col.lower() or 'num' in col.lower():
+                                police_col = col
+                                break
+                        
+                        if police_col:
+                            occurrences = df[police_col].value_counts().value_counts().sort_index()
                             
                             fig = px.bar(
                                 x=occurrences.index,
@@ -3294,6 +2439,7 @@ def page_gestion_production():
             template_file = st.file_uploader(
                 "Importer un modèle Word",
                 type=['docx'],
+                key="template_upload",
                 help="Fichier modèle au format Word (.docx)"
             )
             
@@ -3310,6 +2456,7 @@ def page_gestion_production():
             data_file = st.file_uploader(
                 "Importer les données",
                 type=['xlsx', 'xls', 'csv'],
+                key="production_data_upload",
                 help="Fichier contenant les données pour les certificats"
             )
             
@@ -3432,7 +2579,7 @@ def page_gestion_production():
                 with col2:
                     st.metric("Format", output_format)
                 with col3:
-                    taille_estimée = total * 50  # Estimation 50KB par certificat
+                    taille_estimée = total * 50
                     st.metric("Taille estimée", f"{taille_estimée / 1024:.1f} MB")
                 
                 # Bouton de téléchargement simulé
@@ -3544,7 +2691,6 @@ def page_statistiques():
         # Simulation de données de tendance
         dates = pd.date_range(end=datetime.now(), periods=30, freq='D')
         
-        # Génération de données simulées
         np.random.seed(42)
         imports_data = np.random.randint(5, 20, 30)
         verifications_data = np.random.randint(10, 30, 30)
@@ -3911,25 +3057,30 @@ def page_administration():
     with tab4:
         st.markdown("### Gestion des sauvegardes")
         
-        backup_manager = BackupManager()
-        
         col1, col2 = st.columns(2)
         
         with col1:
             if st.button("💾 Créer une sauvegarde", use_container_width=True):
                 with st.spinner("Création de la sauvegarde..."):
-                    success, result = backup_manager.create_backup("Sauvegarde manuelle")
-                    if success:
-                        st.success(f"Sauvegarde créée: {os.path.basename(result)}")
+                    # Créer un dossier backups si nécessaire
+                    os.makedirs("backups", exist_ok=True)
+                    
+                    # Créer une sauvegarde simple
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    backup_file = f"backups/backup_{timestamp}.db"
+                    
+                    if os.path.exists(DB_FILE):
+                        shutil.copy2(DB_FILE, backup_file)
+                        st.success(f"Sauvegarde créée: {os.path.basename(backup_file)}")
                         st.balloons()
                     else:
-                        st.error(f"Erreur: {result}")
+                        st.error("Fichier de base de données introuvable")
         
         with col2:
             # Liste des sauvegardes
             backup_dir = "backups"
             if os.path.exists(backup_dir):
-                backups = [f for f in os.listdir(backup_dir) if f.startswith("backup_") and f.endswith(".enc")]
+                backups = [f for f in os.listdir(backup_dir) if f.startswith("backup_") and f.endswith(".db")]
                 
                 if backups:
                     selected_backup = st.selectbox("Sauvegardes disponibles", backups)
@@ -3938,11 +3089,12 @@ def page_administration():
                         if st.checkbox("Confirmer la restauration"):
                             with st.spinner("Restauration en cours..."):
                                 backup_path = os.path.join(backup_dir, selected_backup)
-                                success, result = backup_manager.restore_backup(backup_path)
-                                if success:
-                                    st.success(result)
+                                if os.path.exists(backup_path):
+                                    shutil.copy2(backup_path, DB_FILE)
+                                    st.success("Restauration réussie")
+                                    st.rerun()
                                 else:
-                                    st.error(result)
+                                    st.error("Fichier de sauvegarde introuvable")
         
         # Configuration des sauvegardes
         st.markdown("### Configuration des sauvegardes")
@@ -4043,90 +3195,55 @@ def sidebar():
         # En-tête
         st.markdown("""
         <div style="text-align: center; padding: 20px 10px;">
-            <h2 style="color: white; margin-bottom: 5px;">AGC-VIE</h2>
-            <p style="color: rgba(255,255,255,0.7); font-size: 0.9em;">Version 2.0</p>
+            <h2 style="color: #1e3c72; margin-bottom: 5px;">AGC-VIE</h2>
+            <p style="color: #666; font-size: 0.9em;">Version 2.0</p>
         </div>
         """, unsafe_allow_html=True)
         
         # Informations utilisateur
         if st.session_state.authenticated:
             st.markdown(f"""
-            <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                <p style="color: white; margin: 0; font-size: 1.1em;">👤 {st.session_state.username}</p>
-                <p style="color: #4CAF50; margin: 5px 0 0 0; font-size: 0.9em;">
+            <div style="background: rgba(30, 60, 114, 0.1); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                <p style="color: #1e3c72; margin: 0; font-size: 1.1em;">👤 {st.session_state.username}</p>
+                <p style="color: #28a745; margin: 5px 0 0 0; font-size: 0.9em;">
                     {'👑 Administrateur' if st.session_state.role == 'admin' else '👤 Utilisateur'}
                 </p>
-                <p style="color: rgba(255,255,255,0.5); margin: 5px 0 0 0; font-size: 0.8em;">
+                <p style="color: #999; margin: 5px 0 0 0; font-size: 0.8em;">
                     {datetime.now().strftime('%d/%m/%Y %H:%M')}
                 </p>
             </div>
             """, unsafe_allow_html=True)
         
-        # Menu principal avec streamlit-option-menu
-        selected = option_menu(
-            menu_title=None,
-            options=[
-                "Accueil",
-                "Gestion Technique",
-                "Gestion Comptable",
-                "Rapprochement Technique",
-                "Rapprochement Comptable",
-                "Gestion 410 & 411",
-                "Gestion Doublons",
-                "Gestion Production",
-                "Statistiques",
-                "Administration",
-                "Déconnexion"
-            ],
-            icons=[
-                "house",
-                "bar-chart",
-                "cash",
-                "arrow-repeat",
-                "arrow-repeat",
-                "folder",
-                "files",
-                "file-earmark",
-                "graph-up",
-                "gear",
-                "box-arrow-right"
-            ],
-            menu_icon="cast",
-            default_index=0,
-            styles={
-                "container": {
-                    "padding": "0!important",
-                    "background-color": "blue"
-                },
-                "icon": {
-                    "color": "white",
-                    "font-size": "18px"
-                },
-                "nav-link": {
-                    "color": "white",
-                    "font-size": "16px",
-                    "text-align": "left",
-                    "margin": "5px 0",
-                    "padding": "10px 15px",
-                    "border-radius": "8px",
-                    "transition": "all 0.3s"
-                },
-                "nav-link:hover": {
-                    "background-color": "rgba(255,255,255,0.1)",
-                    "transform": "translateX(5px)"
-                },
-                "nav-link-selected": {
-                    "background": "linear-gradient(135deg, #2a5298 0%, #1e3c72 100%)",
-                    "font-weight": "bold",
-                    "box-shadow": "0 4px 6px rgba(0,0,0,0.2)"
-                }
-            }
+        # Menu de navigation
+        menu_options = {
+            "Accueil": "🏠",
+            "Gestion Technique": "📊",
+            "Gestion Comptable": "💰",
+            "Rapprochement Technique": "🔄",
+            "Rapprochement Comptable": "🔄",
+            "Gestion 410 & 411": "📋",
+            "Gestion Doublons": "🔍",
+            "Gestion Production": "📄",
+            "Statistiques": "📈",
+            "Administration": "⚙️" if st.session_state.role == "admin" else None,
+            "Déconnexion": "🚪"
+        }
+        
+        # Filtrer les options
+        filtered_options = {k: v for k, v in menu_options.items() if v is not None}
+        
+        selected = st.radio(
+            "Navigation",
+            list(filtered_options.keys()),
+            format_func=lambda x: f"{filtered_options[x]} {x}",
+            key="navigation",
+            label_visibility="collapsed"
         )
         
         # Pied de page
         st.markdown("---")
         st.markdown("""
-        <div style="text-align: center; color: rgba(255,255,255,0.5); font-size: 0.8em; padding: 10px;">
+        <div style="text-align: center; color: #999; font-size: 0.8em; padding: 10px;">
             <p>© 2025 AGC-VIE</p>
             <p>Version 2.0</p>
         </div>
@@ -4137,6 +3254,9 @@ def sidebar():
 # ======================== FONCTION PRINCIPALE ========================
 def main():
     """Fonction principale de l'application"""
+    
+    # Appliquer les styles CSS
+    apply_custom_css()
     
     # Vérification du timeout de session
     if st.session_state.authenticated:
@@ -4177,27 +3297,17 @@ def main():
         page_administration()
     elif selected == "Déconnexion":
         logout()
-    
-    # Pied de page commun
-    st.markdown("""
-    <div style="text-align: center; color: #666; padding: 20px;">
-        <p>AGC-VIE - Système de Gestion Technique et Comptable</p>
-        <p style="font-size: 0.9em;">Développé par Frédéric BAYONNE MAVOUNGOU | Ingénieur en Génie Numérique</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-# ======================== IMPORT DES MODULES MANQUANTS ========================
-from datetime import datetime, timedelta
-from typing import Optional, Dict, List, Any, Tuple
 
 # ======================== POINT D'ENTRÉE ========================
 if __name__ == "__main__":
+    # Initialisation de la session
+    init_session_state()
+    
+    # Exécution de l'application
     try:
         main()
     except Exception as e:
         st.error(f"Erreur critique: {str(e)}")
         log_action("Erreur critique", str(e), level="error")
-        
-        # Affichage détaillé en mode développement
         if os.getenv('ENVIRONMENT') == 'development':
             st.exception(e)
