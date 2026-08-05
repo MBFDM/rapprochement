@@ -60,7 +60,7 @@ warnings.filterwarnings('ignore')
 # ======================== CONFIGURATION DE LA PAGE ========================
 st.set_page_config(
     page_title="AGC-VIE - Gestion Technique et Comptable",
-    page_icon="📊",
+    page_icon="logo_1.jpg",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
