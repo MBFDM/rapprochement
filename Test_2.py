@@ -3732,34 +3732,124 @@ def page_administration():
 def sidebar():
     """Affiche la barre latérale"""
     with st.sidebar:
-        # En-tête avec logo - Utilisation de st.image()
-        try:
-            from PIL import Image
-            import os
-            
-            # Vérifier si le fichier existe
-            if os.path.exists("logo_1.jpg"):
-                logo = Image.open("logo_1.jpg")
-                st.image(logo, width=100)
-            else:
-                st.markdown("""
-                <div style="text-align: center; font-size: 3em; margin-bottom: 10px;">
-                    🏢
-                </div>
-                """, unsafe_allow_html=True)
-        except:
-            st.markdown("""
-            <div style="text-align: center; font-size: 3em; margin-bottom: 10px;">
-                🏢
-            </div>
-            """, unsafe_allow_html=True)
+    # En-tête avec logo amélioré
+    try:
+        from PIL import Image
+        import os
         
+        if os.path.exists("logo_1.jpg"):
+            logo = Image.open("logo_1.jpg")
+            
+            # Utiliser st.columns pour centrer
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                # Image avec bordure et ombre
+                st.markdown("""
+                <style>
+                    .logo-container {
+                        display: flex;
+                        justify-content: center;
+                        margin-bottom: 10px;
+                    }
+                    .logo-container img {
+                        border-radius: 50%;
+                        border: 4px solid #667eea;
+                        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+                        transition: all 0.3s ease;
+                        width: 120px;
+                        height: 120px;
+                        object-fit: cover;
+                    }
+                    .logo-container img:hover {
+                        transform: scale(1.05) rotate(-5deg);
+                        box-shadow: 0 12px 35px rgba(102, 126, 234, 0.6);
+                    }
+                </style>
+                """, unsafe_allow_html=True)
+                
+                st.image(logo, width=120)
+        else:
+            # Fallback avec emoji stylisé
+            st.markdown("""
+            <style>
+                .logo-fallback {
+                    text-align: center;
+                    font-size: 4em;
+                    margin: 10px 0;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    display: inline-block;
+                    width: 100%;
+                    filter: drop-shadow(0 4px 15px rgba(102, 126, 234, 0.3));
+                }
+            </style>
+            <div class="logo-fallback">🏢</div>
+            """, unsafe_allow_html=True)
+    except:
         st.markdown("""
-        <div style="text-align: center;">
-            <h2 style="color: #1e3c72; margin: 0; border-bottom: none;">AGC-VIE</h2>
-            <p style="color: #666; font-size: 0.9em; margin-top: 5px;">Version 2.0</p>
-        </div>
+        <style>
+            .logo-fallback {
+                text-align: center;
+                font-size: 4em;
+                margin: 10px 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                display: inline-block;
+                width: 100%;
+                filter: drop-shadow(0 4px 15px rgba(102, 126, 234, 0.3));
+            }
+        </style>
+        <div class="logo-fallback">🏢</div>
         """, unsafe_allow_html=True)
+    
+    # Titre avec design amélioré
+    st.markdown("""
+    <style>
+        .sidebar-title {
+            text-align: center;
+            margin: 5px 0 0 0;
+        }
+        .sidebar-title h2 {
+            color: #1e3c72;
+            margin: 0;
+            border-bottom: none !important;
+            font-weight: 700;
+            font-size: 1.8em;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 1px;
+        }
+        .sidebar-title .subtitle {
+            color: #888;
+            font-size: 0.85em;
+            margin: 2px 0 0 0;
+            font-weight: 300;
+            letter-spacing: 2px;
+        }
+        .sidebar-title .version {
+            color: #aaa;
+            font-size: 0.7em;
+            margin: 2px 0 0 0;
+            font-weight: 300;
+        }
+        .sidebar-divider {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #667eea, #764ba2, transparent);
+            margin: 10px 0 15px 0;
+            border-radius: 2px;
+        }
+    </style>
+    
+    <div class="sidebar-title">
+        <h2>AGC-VIE</h2>
+        <p class="subtitle">Gestion Technique &amp; Comptable</p>
+        <p class="version">Version 2.0</p>
+    </div>
+    <div class="sidebar-divider"></div>
+    """, unsafe_allow_html=True)
         
         # Informations utilisateur
         if st.session_state.authenticated:
