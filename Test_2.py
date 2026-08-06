@@ -3727,79 +3727,37 @@ def page_administration():
             st.session_state.security_config = config
             st.success("Paramètres de sécurité mis à jour")
             log_action("Configuration", "Paramètres de sécurité modifiés")
+            
 
     with st.sidebar:
-        # En-tête avec logo amélioré
+        # En-tête avec logo - Utilisation de st.image()
         try:
             from PIL import Image
             import os
             
+            # Vérifier si le fichier existe
             if os.path.exists("logo_1.jpg"):
                 logo = Image.open("logo_1.jpg")
-                
-                # Utiliser st.columns pour centrer
-                col1, col2, col3 = st.columns([1, 2, 1])
-                with col2:
-                    # Image avec bordure et ombre
-                    st.markdown("""
-                    <style>
-                        .logo-container {
-                            display: flex;
-                            justify-content: center;
-                            margin-bottom: 10px;
-                        }
-                        .logo-container img {
-                            border-radius: 50%;
-                            border: 4px solid #667eea;
-                            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-                            transition: all 0.3s ease;
-                            width: 120px;
-                            height: 120px;
-                            object-fit: cover;
-                        }
-                        .logo-container img:hover {
-                            transform: scale(1.05) rotate(-5deg);
-                            box-shadow: 0 12px 35px rgba(102, 126, 234, 0.6);
-                        }
-                    </style>
-                    """, unsafe_allow_html=True)
-                    
-                    st.image(logo, width=120)
+                st.image(logo, width=100)
             else:
-                # Fallback avec emoji stylisé
                 st.markdown("""
-                <style>
-                    .logo-fallback {
-                        text-align: center;
-                        font-size: 4em;
-                        margin: 10px 0;
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        -webkit-background-clip: text;
-                        -webkit-text-fill-color: transparent;
-                        display: inline-block;
-                        width: 100%;
-                        filter: drop-shadow(0 4px 15px rgba(102, 126, 234, 0.3));
-                    }
-                </style>
-                <div class="logo-fallback">🏢</div>
+                <div style="text-align: center; font-size: 3em; margin-bottom: 10px;">
+                    🏢
+                </div>
                 """, unsafe_allow_html=True)
         except:
             st.markdown("""
-            <style>
-                .logo-fallback {
-                    text-align: center;
-                    font-size: 4em;
-                    margin: 10px 0;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    display: inline-block;
-                    width: 100%;
-                    filter: drop-shadow(0 4px 15px rgba(102, 126, 234, 0.3));
-                }
-            </style>
-            <div class="logo-fallback">🏢</div>
+            <div style="text-align: center; font-size: 3em; margin-bottom: 10px;">
+                🏢
+            </div>
             """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div style="text-align: center;">
+            <h2 style="color: #1e3c72; margin: 0; border-bottom: none;">AGC-VIE</h2>
+            <p style="color: #666; font-size: 0.9em; margin-top: 5px;">Version 2.0</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Titre avec design amélioré
         st.markdown("""
