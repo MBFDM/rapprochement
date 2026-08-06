@@ -3740,7 +3740,7 @@ def sidebar():
                 padding: 20px 10px 15px 10px;
             }
             .sidebar-logo img {
-                width: 80px;
+                width: 100px;
                 height: auto;
                 border-radius: 50%;
                 box-shadow: 0 4px 15px rgba(0,0,0,0.2);
