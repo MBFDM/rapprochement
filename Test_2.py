@@ -3729,86 +3729,68 @@ def page_administration():
             log_action("Configuration", "Paramètres de sécurité modifiés")
 
 
+# ======================== BARRE LATÉRALE ========================
 def sidebar():
-    # En-tête avec logo - Utilisation de st.image()
-    try:
-        from PIL import Image
-        import os
+    """Affiche la barre latérale"""
+    with st.sidebar:
+        # En-tête
+        st.markdown("""
+        <div style="text-align: center; padding: 20px 10px;">
+            <h2 style="color: #1e3c72; margin-bottom: 5px;">AGC-VIE</h2>
+            <p style="color: #666; font-size: 0.9em;">Version 2.0</p>
+        </div>
+        """, unsafe_allow_html=True)
         
-        # Vérifier si le fichier existe
-        if os.path.exists("logo_1.jpg"):
-            logo = Image.open("logo_1.jpg")
-            st.image(logo, width=100)
-        else:
-            st.markdown("""
-            <div style="text-align: center; font-size: 3em; margin-bottom: 10px;">
-                🏢
+        # Informations utilisateur
+        if st.session_state.authenticated:
+            st.markdown(f"""
+            <div style="background: rgba(30, 60, 114, 0.1); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                <p style="color: #1e3c72; margin: 0; font-size: 1.1em;">👤 {st.session_state.username}</p>
+                <p style="color: #28a745; margin: 5px 0 0 0; font-size: 0.9em;">
+                    {'👑 Administrateur' if st.session_state.role == 'admin' else '👤 Utilisateur'}
+                </p>
+                <p style="color: #999; margin: 5px 0 0 0; font-size: 0.8em;">
+                    {datetime.now().strftime('%d/%m/%Y %H:%M')}
+                </p>
             </div>
             """, unsafe_allow_html=True)
-    except:
+        
+        # Menu de navigation
+        menu_options = {
+            "Accueil": "🏠",
+            "Gestion Technique": "📊",
+            "Gestion Comptable": "💰",
+            "Rapprochement Technique": "🔄",
+            "Rapprochement Comptable": "🔄",
+            "Gestion 410 & 411": "📋",
+            "Gestion Doublons": "🔍",
+            "Gestion Production": "📄",
+            "Statistiques": "📈",
+            "Administration": "⚙️" if st.session_state.role == "admin" else None,
+            "Déconnexion": "🚪"
+        }
+        
+        # Filtrer les options
+        filtered_options = {k: v for k, v in menu_options.items() if v is not None}
+        
+        selected = st.radio(
+            "Navigation",
+            list(filtered_options.keys()),
+            format_func=lambda x: f"{filtered_options[x]} {x}",
+            key="navigation",
+            label_visibility="collapsed"
+        )
+        
+        # Pied de page
+        st.markdown("---")
         st.markdown("""
-        <div style="text-align: center; font-size: 3em; margin-bottom: 10px;">
-            🏢
+        <div style="text-align: center; color: #999; font-size: 0.8em; padding: 10px;">
+            <p>© 2025 AGC-VIE</p>
+            <p>Version 2.0</p>
         </div>
         """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div style="text-align: center;">
-        <h2 style="color: #1e3c72; margin: 0; border-bottom: none;">AGC-VIE</h2>
-        <p style="color: #666; font-size: 0.9em; margin-top: 5px;">Version 2.0</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Informations utilisateur
-    if st.session_state.authenticated:
-        st.markdown(f"""
-        <div style="background: rgba(30, 60, 114, 0.1); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-            <p style="color: #1e3c72; margin: 0; font-size: 1.1em;">👤 {st.session_state.username}</p>
-            <p style="color: #28a745; margin: 5px 0 0 0; font-size: 0.9em;">
-                {'👑 Administrateur' if st.session_state.role == 'admin' else '👤 Utilisateur'}
-            </p>
-            <p style="color: #999; margin: 5px 0 0 0; font-size: 0.8em;">
-                {datetime.now().strftime('%d/%m/%Y %H:%M')}
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Menu de navigation
-    menu_options = {
-        "Accueil": "🏠",
-        "Gestion Technique": "📊",
-        "Gestion Comptable": "💰",
-        "Rapprochement Technique": "🔄",
-        "Rapprochement Comptable": "🔄",
-        "Gestion 410 & 411": "📋",
-        "Gestion Doublons": "🔍",
-        "Gestion Production": "📄",
-        "Statistiques": "📈",
-        "Administration": "⚙️" if st.session_state.role == "admin" else None,
-        "Déconnexion": "🚪"
-    }
-    
-    # Filtrer les options
-    filtered_options = {k: v for k, v in menu_options.items() if v is not None}
-    
-    selected = st.radio(
-        "Navigation",
-        list(filtered_options.keys()),
-        format_func=lambda x: f"{filtered_options[x]} {x}",
-        key="navigation",
-        label_visibility="collapsed"
-    )
-    
-    # Pied de page
-    #st.markdown("---")
-    st.markdown("""
-    <div style="text-align: center; color: #999; font-size: 0.8em; padding: 10px;">
-        <p>© 2025 AGC-VIE</p>
-        <p>Version 2.0</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    return selected
+        
+        return selected
 
 # ======================== FONCTION PRINCIPALE ========================
 def main():
