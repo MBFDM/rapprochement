@@ -1122,16 +1122,6 @@ def page_login():
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
-        st.markdown("""
-        <div style="text-align: center; padding: 40px; animation: fadeIn 0.5s;">
-            <!--h1 style="color: #1e3c72; font-size: 3em; margin-bottom: 10px;">AGC-VIE</h1-->
-            <img src="logo_1.jpg" width="100px" height="100px">
-            <p style="color: #666; font-size: 1.2em; margin-bottom: 30px;">
-                Système de Gestion Technique et Comptable
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-        
         with st.form("login_form", clear_on_submit=True):
             st.markdown("### Connexion")
             
