@@ -3730,10 +3730,29 @@ def page_administration():
 
 
 # ======================== BARRE LATÉRALE ========================
+import base64
+import os
+
+def get_image_base64(image_path):
+    """Convertit une image en base64"""
+    try:
+        with open(image_path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    except:
+        return None
+
 # ======================== BARRE LATÉRALE ========================
 def sidebar():
     """Affiche la barre latérale"""
     with st.sidebar:
+        # Convertir l'image en base64
+        logo_b64 = get_image_base64("logo_1.jpg")
+        
+        if logo_b64:
+            img_src = f"data:image/jpg;base64,{logo_b64}"
+        else:
+            # Fallback SVG
+            img_src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgICA8ZGVmcz4KICAgICAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdyYWQiIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPgogICAgICAgICAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdHlsZT0ic3RvcC1jb2xvcjojNjY3ZWVhO3N0b3Atb3BhY2l0eToxIiAvPgogICAgICAgICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0eWxlPSJzdG9wLWNvbG9yOiM3NjRiYTI7c3RvcC1vcGFjaXR5OjEiIC8+CiAgICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwvZGVmcz4KICAgIDxyZWN0IHdpZHRoPSI5MCIgaGVpZ2h0PSI5MCIgeD0iNSIgeT0iNSIgcng9IjI1IiBmaWxsPSJ1cmwoI2dyYWQpIiAvPgogICAgPHRleHQgeD0iNTAiIHk9IjU1IiBmb250LXNpemU9IjQwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC13ZWlnaHQ9ImJvbGQiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiI+QVY8L3RleHQ+CiAgICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtZGFzaGFycmF5PSI1LDYiIG9wYWNpdHk9IjAuNSIgLz4KPC9zdmc+"
         # CSS personnalisé pour la barre latérale
         st.markdown("""
         <style>
@@ -3959,15 +3978,20 @@ def sidebar():
                 margin: 8px auto;
                 background: linear-gradient(90deg, transparent, #ddd, transparent);
             }
+            .sidebar-header .logo-wrapper img {{
+                width: 100px;
+                height: 100px;
+                border-radius: 50%;
+                border: 3px solid rgba(255,255,255,0.3);
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+                object-fit: cover;
+            }}
         </style>
-        """, unsafe_allow_html=True)
-        
-        # En-tête avec logo amélioré
-        st.markdown("""
         <div class="sidebar-header">
             <div class="logo-container">
                 <div class="logo-wrapper">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgICA8ZGVmcz4KICAgICAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdyYWQiIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPgogICAgICAgICAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdHlsZT0ic3RvcC1jb2xvcjojNjY3ZWVhO3N0b3Atb3BhY2l0eToxIiAvPgogICAgICAgICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0eWxlPSJzdG9wLWNvbG9yOiM3NjRiYTI7c3RvcC1vcGFjaXR5OjEiIC8+CiAgICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwvZGVmcz4KICAgIDxyZWN0IHdpZHRoPSI5MCIgaGVpZ2h0PSI5MCIgeD0iNSIgeT0iNSIgcng9IjI1IiBmaWxsPSJ1cmwoI2dyYWQpIiAvPgogICAgPHRleHQgeD0iNTAiIHk9IjU1IiBmb250LXNpemU9IjQwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC13ZWlnaHQ9ImJvbGQiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiI+QVY8L3RleHQ+CiAgICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtZGFzaGFycmF5PSI1LDYiIG9wYWNpdHk9IjAuNSIgLz4KPC9zdmc+" alt="AGC-VIE Logo">
+                    <img src="{img_src}" alt="AGC-VIE Logo">
                     <div class="logo-ring"></div>
                 </div>
                 <div class="app-title">AGC-VIE</div>
