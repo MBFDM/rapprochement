@@ -1165,7 +1165,7 @@ def page_login():
         
         st.markdown("""
         <div style="text-align: center; color: #666; font-size: 0.9em; margin-top: 20px;">
-            <p>Compte démo: admin / Admin123!</p>
+            <!--p>Compte démo: admin / Admin123!</p-->
             <p>© 2025 AGC-VIE - Tous droits réservés</p>
         </div>
         """, unsafe_allow_html=True)
@@ -1177,7 +1177,7 @@ def page_accueil():
     st.markdown("""
     <div class="content-card fade-in" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
          padding: 30px; border-radius: 15px; text-align: center; margin-bottom: 30px;">
-        <h1 style="color: white; font-size: 2.5em; margin-bottom: 10px;">🏢 AGC-VIE</h1>
+        <h1 style="color: white; font-size: 2.5em; margin-bottom: 10px;">AGC-VIE</h1>
         <p style="color: white; font-size: 1.2em; opacity: 0.9;">
             Système intégré de Gestion Technique et Comptable
         </p>
@@ -1239,7 +1239,7 @@ def page_accueil():
     with col1:
         st.markdown("""
         <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <h4 style="color: #1e3c72; margin-bottom: 15px;">📋 Dernières activités</h4>
+            <h4 style="color: #1e3c72; margin-bottom: 15px;">📋 Activités</h4>
         """, unsafe_allow_html=True)
         
         if st.session_state.logs:
@@ -3790,7 +3790,7 @@ def sidebar():
         )
         
         # Pied de page
-        st.markdown("---")
+        #st.markdown("---")
         st.markdown("""
         <div style="text-align: center; color: #999; font-size: 0.8em; padding: 10px;">
             <p>© 2025 AGC-VIE</p>
