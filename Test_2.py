@@ -3731,11 +3731,8 @@ def page_administration():
             log_action("Configuration", "Paramètres de sécurité modifiés")
 
 
-    # ======================== BARRE LATÉRALE ========================
-def sidebar():
-    """Affiche la barre latérale"""
-    with st.sidebar:
-        # En-tête avec logo
+    def sidebar():
+        # En-tête avec logo - Utilisation de st.image()
         try:
             from PIL import Image
             import os
@@ -3805,6 +3802,7 @@ def sidebar():
         )
         
         # Pied de page
+        #st.markdown("---")
         st.markdown("""
         <div style="text-align: center; color: #999; font-size: 0.8em; padding: 10px;">
             <p>© 2025 AGC-VIE</p>
