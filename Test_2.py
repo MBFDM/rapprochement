@@ -3900,6 +3900,7 @@ def sidebar():
                 box-shadow: 0 2px 10px rgba(0,0,0,0.05);
                 border: 1px solid rgba(255,255,255,0.2);
                 transition: all 0.3s ease;
+                text-align: center;
             }
             
             .user-card:hover {
@@ -4022,7 +4023,7 @@ def sidebar():
         try:
             if os.path.exists("logo_1.jpg"):
                 logo = Image.open("logo_1.jpg")
-                st.image(logo, width=230)
+                st.image(logo, width=240)
             else:
                 st.markdown("""
                 <div style="text-align: center; font-size: 3em; margin-bottom: 10px;">
