@@ -4022,7 +4022,7 @@ def sidebar():
         try:
             if os.path.exists("logo_1.jpg"):
                 logo = Image.open("logo_1.jpg")
-                st.image(logo, width=220)
+                st.image(logo, width=230)
             else:
                 st.markdown("""
                 <div style="text-align: center; font-size: 3em; margin-bottom: 10px;">
@@ -4047,7 +4047,7 @@ def sidebar():
         # ============ CARTE UTILISATEUR ============
         if st.session_state.authenticated:
             role_class = "admin" if st.session_state.role == "admin" else "user"
-            role_icon = "👑" if st.session_state.role == "admin" else "👤"
+            role_icon = "👑" if st.session_state.role == "admin" else "_"
             role_text = "Administrateur" if st.session_state.role == "admin" else "Utilisateur"
             
             st.markdown(f"""
@@ -4065,9 +4065,9 @@ def sidebar():
             "Gestion Comptable": "💰",
             "Rapprochement Technique": "🔄",
             "Rapprochement Comptable": "📋",
-            "Gestion 410 & 411": "📁",
+            #"Gestion 410 & 411": "📁",
             "Gestion Doublons": "🔍",
-            "Gestion Production": "📄",
+            #"Gestion Production": "📄",
             "Statistiques": "📈",
         }
         
@@ -4088,16 +4088,16 @@ def sidebar():
         )
         
         # ============ PIED DE PAGE ============
-        st.markdown("""
-        <div class="sidebar-footer">
-            <div class="footer-logo">🏢</div>
-            <div class="footer-divider"></div>
-            <div class="footer-text">© 2025 AGC-VIE</div>
-            <div class="footer-text" style="color: #bbb;">Tous droits réservés</div>
-            <div class="footer-divider"></div>
-            <div class="footer-text" style="font-size: 0.7em; color: #ccc;">Made with ❤️</div>
-        </div>
-        """, unsafe_allow_html=True)
+        #st.markdown("""
+        #<div class="sidebar-footer">
+        #    <div class="footer-logo">🏢</div>
+        #    <div class="footer-divider"></div>
+        #    <div class="footer-text">© 2025 AGC-VIE</div>
+        #    <div class="footer-text" style="color: #bbb;">Tous droits réservés</div>
+        #    <div class="footer-divider"></div>
+        #    <div class="footer-text" style="font-size: 0.7em; color: #ccc;">Made with ❤️</div>
+        #</div>
+        #""", unsafe_allow_html=True)
         
         return selected
 
