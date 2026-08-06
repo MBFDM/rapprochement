@@ -3728,10 +3728,7 @@ def page_administration():
             st.success("Paramètres de sécurité mis à jour")
             log_action("Configuration", "Paramètres de sécurité modifiés")
 
-    # ======================== BARRE LATÉRALE ========================
-    def sidebar():
-        """Affiche la barre latérale"""
-        with st.sidebar:
+    with st.sidebar:
         # En-tête avec logo amélioré
         try:
             from PIL import Image
@@ -3803,6 +3800,53 @@ def page_administration():
             </style>
             <div class="logo-fallback">🏢</div>
             """, unsafe_allow_html=True)
+        
+        # Titre avec design amélioré
+        st.markdown("""
+        <style>
+            .sidebar-title {
+                text-align: center;
+                margin: 5px 0 0 0;
+            }
+            .sidebar-title h2 {
+                color: #1e3c72;
+                margin: 0;
+                border-bottom: none !important;
+                font-weight: 700;
+                font-size: 1.8em;
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                letter-spacing: 1px;
+            }
+            .sidebar-title .subtitle {
+                color: #888;
+                font-size: 0.85em;
+                margin: 2px 0 0 0;
+                font-weight: 300;
+                letter-spacing: 2px;
+            }
+            .sidebar-title .version {
+                color: #aaa;
+                font-size: 0.7em;
+                margin: 2px 0 0 0;
+                font-weight: 300;
+            }
+            .sidebar-divider {
+                height: 2px;
+                background: linear-gradient(90deg, transparent, #667eea, #764ba2, transparent);
+                margin: 10px 0 15px 0;
+                border-radius: 2px;
+            }
+        </style>
+        
+        <div class="sidebar-title">
+            <h2>AGC-VIE</h2>
+            <p class="subtitle">Gestion Technique &amp; Comptable</p>
+            <p class="version">Version 2.0</p>
+        </div>
+        <div class="sidebar-divider"></div>
+        """, unsafe_allow_html=True)
         
         # Titre avec design amélioré
         st.markdown("""
