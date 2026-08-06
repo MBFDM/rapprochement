@@ -4022,7 +4022,7 @@ def sidebar():
         try:
             if os.path.exists("logo_1.jpg"):
                 logo = Image.open("logo_1.jpg")
-                st.image(logo, width=250)
+                st.image(logo, width=220)
             else:
                 st.markdown("""
                 <div style="text-align: center; font-size: 3em; margin-bottom: 10px;">
