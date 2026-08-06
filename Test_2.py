@@ -1,5 +1,3 @@
-Erreur critique: name 'sidebar' is not defined
-
 """
 Application de Gestion Technique et Comptable AGC-VIE
 Version Streamlit - Conversion complète de l'application Tkinter
