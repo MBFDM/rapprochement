@@ -3393,480 +3393,486 @@ def page_statistiques():
         else:
             st.info("Aucun log à exporter")
 
-def page_administration():
-    """Page d'administration"""
-    update_last_activity()
-    
-    # Vérification des droits
-    if st.session_state.role != "admin":
-        st.error("⛔ Accès réservé aux administrateurs")
-        return
-    
-    st.markdown("## ⚙️ Administration")
-    
-    # Onglets
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "👥 Utilisateurs", "📋 Logs", "📜 Historique", 
-        "💾 Sauvegardes", "🔧 Paramètres"
-    ])
-    
-    with tab1:
-        st.markdown("### Gestion des utilisateurs")
-        
-        # Liste des utilisateurs
-        users = get_all_users()
-        
-        if users:
-            users_df = pd.DataFrame(users)
-            st.dataframe(users_df, use_container_width=True, hide_index=True)
-        
-        # Formulaire d'ajout
-        with st.expander("➕ Ajouter un utilisateur"):
-            with st.form("add_user_form"):
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    new_username = st.text_input("Nom d'utilisateur*")
-                    new_password = st.text_input("Mot de passe*", type="password")
-                
-                with col2:
-                    new_email = st.text_input("Email*")
-                    new_role = st.selectbox("Rôle", ["user", "admin"])
-                
-                if st.form_submit_button("Ajouter l'utilisateur", use_container_width=True):
-                    if new_username and new_password and new_email:
-                        success, message = add_user(new_username, new_password, new_email, new_role)
-                        if success:
-                            st.success(message)
-                            st.rerun()
-                        else:
-                            st.error(message)
-                    else:
-                        st.warning("Veuillez remplir tous les champs obligatoires")
-        
-        # Modification / Suppression
-        if users:
-            with st.expander("✏️ Modifier un utilisateur"):
-                selected_user = st.selectbox(
-                    "Sélectionner un utilisateur",
-                    [u['username'] for u in users]
-                )
-                
-                user_data = next((u for u in users if u['username'] == selected_user), None)
-                
-                if user_data:
-                    with st.form("edit_user_form"):
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            edit_email = st.text_input("Email", value=user_data.get('email', ''))
-                            edit_role = st.selectbox(
-                                "Rôle",
-                                ["user", "admin"],
-                                index=0 if user_data.get('role') == 'user' else 1
-                            )
-                        
-                        with col2:
-                            edit_status = st.selectbox(
-                                "Statut",
-                                ["active", "inactive"],
-                                index=0 if user_data.get('status') == 'active' else 1
-                            )
-                            edit_password = st.text_input("Nouveau mot de passe (optionnel)", type="password")
-                        
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            if st.form_submit_button("💾 Mettre à jour", use_container_width=True):
-                                update_data = {
-                                    'email': edit_email,
-                                    'role': edit_role,
-                                    'status': edit_status
-                                }
-                                if edit_password:
-                                    update_data['password'] = edit_password
-                                
-                                success, message = update_user(selected_user, update_data)
-                                if success:
-                                    st.success(message)
-                                    st.rerun()
-                                else:
-                                    st.error(message)
-                        
-                        with col2:
-                            if st.form_submit_button("🗑️ Supprimer", use_container_width=True):
-                                if selected_user != st.session_state.username:
-                                    success, message = delete_user(selected_user)
-                                    if success:
-                                        st.success(message)
-                                        st.rerun()
-                                    else:
-                                        st.error(message)
-                                else:
-                                    st.error("Vous ne pouvez pas supprimer votre propre compte")
-    
-    with tab2:
-        st.markdown("### Journal des activités")
-        
-        if st.session_state.logs:
-            logs_df = pd.DataFrame(st.session_state.logs)
-            
-            # Filtres
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                if 'username' in logs_df.columns:
-                    users_filter = ["Tous"] + list(logs_df['username'].unique())
-                    selected_user = st.selectbox("Utilisateur", users_filter)
-            
-            with col2:
-                if 'action' in logs_df.columns:
-                    actions_filter = ["Toutes"] + list(logs_df['action'].unique())
-                    selected_action = st.selectbox("Action", actions_filter)
-            
-            with col3:
-                if 'level' in logs_df.columns:
-                    levels_filter = ["Tous"] + list(logs_df['level'].unique())
-                    selected_level = st.selectbox("Niveau", levels_filter)
-            
-            # Application des filtres
-            filtered_logs = logs_df.copy()
-            
-            if selected_user != "Tous":
-                filtered_logs = filtered_logs[filtered_logs['username'] == selected_user]
-            
-            if selected_action != "Toutes":
-                filtered_logs = filtered_logs[filtered_logs['action'] == selected_action]
-            
-            if selected_level != "Tous":
-                filtered_logs = filtered_logs[filtered_logs['level'] == selected_level]
-            
-            # Affichage
-            st.dataframe(filtered_logs, use_container_width=True, height=500, hide_index=True)
-            
-            # Export
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if st.button("📥 Exporter les logs filtrés", use_container_width=True):
-                    output = export_to_excel([filtered_logs], ["Logs"], "logs_filtres.xlsx")
-                    if output:
-                        create_download_button(
-                            output,
-                            "logs_filtres.xlsx",
-                            "Télécharger Excel"
-                        )
-            
-            with col2:
-                if st.button("🗑️ Effacer les logs", use_container_width=True):
-                    if st.checkbox("Confirmer la suppression"):
-                        st.session_state.logs = []
-                        st.success("Logs effacés")
-                        st.rerun()
-        else:
-            st.info("Aucun log disponible")
-    
-    with tab3:
-        st.markdown("### Historique des actions")
-        
-        if st.session_state.history:
-            history_df = pd.DataFrame(st.session_state.history)
-            
-            # Filtre par utilisateur
-            if 'username' in history_df.columns:
-                users_filter = ["Tous"] + list(history_df['username'].unique())
-                selected_user_hist = st.selectbox("Filtrer par utilisateur", users_filter, key="hist_user")
-                
-                if selected_user_hist != "Tous":
-                    history_df = history_df[history_df['username'] == selected_user_hist]
-            
-            st.dataframe(history_df, use_container_width=True, height=500, hide_index=True)
-            
-            # Export
-            if st.button("📥 Exporter l'historique", use_container_width=True):
-                output = export_to_excel([history_df], ["Historique"], "historique_actions.xlsx")
-                if output:
-                    create_download_button(
-                        output,
-                        "historique_actions.xlsx",
-                        "Télécharger Excel"
-                    )
-        else:
-            st.info("Aucun historique disponible")
-    
-    with tab4:
-        st.markdown("### Gestion des sauvegardes")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("💾 Créer une sauvegarde", use_container_width=True):
-                with st.spinner("Création de la sauvegarde..."):
-                    # Créer un dossier backups si nécessaire
-                    os.makedirs("backups", exist_ok=True)
-                    
-                    # Créer une sauvegarde simple
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    backup_file = f"backups/backup_{timestamp}.db"
-                    
-                    if os.path.exists(DB_FILE):
-                        shutil.copy2(DB_FILE, backup_file)
-                        st.success(f"Sauvegarde créée: {os.path.basename(backup_file)}")
-                        st.balloons()
-                    else:
-                        st.error("Fichier de base de données introuvable")
-        
-        with col2:
-            # Liste des sauvegardes
-            backup_dir = "backups"
-            if os.path.exists(backup_dir):
-                backups = [f for f in os.listdir(backup_dir) if f.startswith("backup_") and f.endswith(".db")]
-                
-                if backups:
-                    selected_backup = st.selectbox("Sauvegardes disponibles", backups)
-                    
-                    if st.button("🔄 Restaurer", use_container_width=True):
-                        if st.checkbox("Confirmer la restauration"):
-                            with st.spinner("Restauration en cours..."):
-                                backup_path = os.path.join(backup_dir, selected_backup)
-                                if os.path.exists(backup_path):
-                                    shutil.copy2(backup_path, DB_FILE)
-                                    st.success("Restauration réussie")
-                                    st.rerun()
-                                else:
-                                    st.error("Fichier de sauvegarde introuvable")
-        
-        # Configuration des sauvegardes
-        st.markdown("### Configuration des sauvegardes")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            backup_interval = st.number_input(
-                "Intervalle (heures)",
-                min_value=1,
-                max_value=168,
-                value=24,
-                help="Intervalle entre les sauvegardes automatiques"
-            )
-        
-        with col2:
-            keep_backups = st.number_input(
-                "Nombre de sauvegardes à conserver",
-                min_value=1,
-                max_value=50,
-                value=10,
-                help="Nombre maximum de sauvegardes à garder"
-            )
-        
-        if st.button("💾 Sauvegarder la configuration", use_container_width=True):
-            st.success("Configuration sauvegardée")
-    
-    with tab5:
-        st.markdown("### Paramètres de sécurité")
-        
-        config = st.session_state.security_config
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("#### Politique de mot de passe")
-            
-            config['min_password_length'] = st.number_input(
-                "Longueur minimale",
-                min_value=6,
-                max_value=20,
-                value=config.get('min_password_length', 8)
-            )
-            
-            config['require_uppercase'] = st.checkbox(
-                "Requiert des majuscules",
-                value=config.get('require_uppercase', True)
-            )
-            
-            config['require_digit'] = st.checkbox(
-                "Requiert des chiffres",
-                value=config.get('require_digit', True)
-            )
-            
-            config['require_special'] = st.checkbox(
-                "Requiert des caractères spéciaux",
-                value=config.get('require_special', True)
-            )
-        
-        with col2:
-            st.markdown("#### Verrouillage de compte")
-            
-            config['max_login_attempts'] = st.number_input(
-                "Tentatives maximales",
-                min_value=3,
-                max_value=10,
-                value=config.get('max_login_attempts', 5)
-            )
-            
-            config['lockout_duration'] = st.number_input(
-                "Durée de verrouillage (minutes)",
-                min_value=5,
-                max_value=1440,
-                value=config.get('lockout_duration', 30)
-            )
-            
-            config['session_timeout'] = st.number_input(
-                "Timeout de session (minutes)",
-                min_value=5,
-                max_value=120,
-                value=config.get('session_timeout', 30)
-            )
-            
-            config['two_factor_enabled'] = st.checkbox(
-                "Activer la double authentification",
-                value=config.get('two_factor_enabled', False)
-            )
-        
-        if st.button("💾 Sauvegarder les paramètres", type="primary", use_container_width=True):
-            st.session_state.security_config = config
-            st.success("Paramètres de sécurité mis à jour")
-            log_action("Configuration", "Paramètres de sécurité modifiés")
 
-
-    with st.sidebar:
-        # En-tête avec logo - Utilisation de st.image()
-        try:
-            from PIL import Image
-            import os
-            
-            # Vérifier si le fichier existe
-            if os.path.exists("logo_1.jpg"):
-                logo = Image.open("logo_1.jpg")
-                st.image(logo, width=100)
-            else:
+    # ======================== BARRE LATÉRALE ========================
+    def sidebar():
+        """Affiche la barre latérale"""
+        with st.sidebar:
+            # En-tête avec logo
+            try:
+                from PIL import Image
+                import os
+                
+                # Vérifier si le fichier existe
+                if os.path.exists("logo_1.jpg"):
+                    logo = Image.open("logo_1.jpg")
+                    st.image(logo, width=100)
+                else:
+                    st.markdown("""
+                    <div style="text-align: center; font-size: 3em; margin-bottom: 10px;">
+                        🏢
+                    </div>
+                    """, unsafe_allow_html=True)
+            except:
                 st.markdown("""
                 <div style="text-align: center; font-size: 3em; margin-bottom: 10px;">
                     🏢
                 </div>
                 """, unsafe_allow_html=True)
-        except:
+            
             st.markdown("""
-            <div style="text-align: center; font-size: 3em; margin-bottom: 10px;">
-                🏢
+            <div style="text-align: center;">
+                <h2 style="color: #1e3c72; margin: 0; border-bottom: none;">AGC-VIE</h2>
+                <p style="color: #666; font-size: 0.9em; margin-top: 5px;">Version 2.0</p>
             </div>
             """, unsafe_allow_html=True)
-        
-        st.markdown("""
-        <div style="text-align: center;">
-            <h2 style="color: #1e3c72; margin: 0; border-bottom: none;">AGC-VIE</h2>
-            <p style="color: #666; font-size: 0.9em; margin-top: 5px;">Version 2.0</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Informations utilisateur
-        if st.session_state.authenticated:
-            st.markdown(f"""
-            <div style="background: rgba(30, 60, 114, 0.1); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                <p style="color: #1e3c72; margin: 0; font-size: 1.1em;">👤 {st.session_state.username}</p>
-                <p style="color: #28a745; margin: 5px 0 0 0; font-size: 0.9em;">
-                    {'👑 Administrateur' if st.session_state.role == 'admin' else '👤 Utilisateur'}
-                </p>
-                <p style="color: #999; margin: 5px 0 0 0; font-size: 0.8em;">
-                    {datetime.now().strftime('%d/%m/%Y %H:%M')}
-                </p>
+            
+            # Informations utilisateur
+            if st.session_state.authenticated:
+                st.markdown(f"""
+                <div style="background: rgba(30, 60, 114, 0.1); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <p style="color: #1e3c72; margin: 0; font-size: 1.1em;">👤 {st.session_state.username}</p>
+                    <p style="color: #28a745; margin: 5px 0 0 0; font-size: 0.9em;">
+                        {'👑 Administrateur' if st.session_state.role == 'admin' else '👤 Utilisateur'}
+                    </p>
+                    <p style="color: #999; margin: 5px 0 0 0; font-size: 0.8em;">
+                        {datetime.now().strftime('%d/%m/%Y %H:%M')}
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Menu de navigation
+            menu_options = {
+                "Accueil": "🏠",
+                "Gestion Technique": "📊",
+                "Gestion Comptable": "💰",
+                "Rapprochement Technique": "🔄",
+                "Rapprochement Comptable": "🔄",
+                "Gestion 410 & 411": "📋",
+                "Gestion Doublons": "🔍",
+                "Gestion Production": "📄",
+                "Statistiques": "📈",
+                "Administration": "⚙️" if st.session_state.role == "admin" else None,
+                "Déconnexion": "🚪"
+            }
+            
+            # Filtrer les options
+            filtered_options = {k: v for k, v in menu_options.items() if v is not None}
+            
+            selected = st.radio(
+                "Navigation",
+                list(filtered_options.keys()),
+                format_func=lambda x: f"{filtered_options[x]} {x}",
+                key="navigation",
+                label_visibility="collapsed"
+            )
+            
+            # Pied de page
+            st.markdown("""
+            <div style="text-align: center; color: #999; font-size: 0.8em; padding: 10px;">
+                <p>© 2025 AGC-VIE</p>
+                <p>Version 2.0</p>
             </div>
             """, unsafe_allow_html=True)
-        
-        # Menu de navigation
-        menu_options = {
-            "Accueil": "🏠",
-            "Gestion Technique": "📊",
-            "Gestion Comptable": "💰",
-            "Rapprochement Technique": "🔄",
-            "Rapprochement Comptable": "🔄",
-            "Gestion 410 & 411": "📋",
-            "Gestion Doublons": "🔍",
-            "Gestion Production": "📄",
-            "Statistiques": "📈",
-            "Administration": "⚙️" if st.session_state.role == "admin" else None,
-            "Déconnexion": "🚪"
-        }
-        
-        # Filtrer les options
-        filtered_options = {k: v for k, v in menu_options.items() if v is not None}
-        
-        selected = st.radio(
-            "Navigation",
-            list(filtered_options.keys()),
-            format_func=lambda x: f"{filtered_options[x]} {x}",
-            key="navigation",
-            label_visibility="collapsed"
-        )
-        
-        # Pied de page
-        #st.markdown("---")
-        st.markdown("""
-        <div style="text-align: center; color: #999; font-size: 0.8em; padding: 10px;">
-            <p>© 2025 AGC-VIE</p>
-            <p>Version 2.0</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        return selected
-
-# ======================== FONCTION PRINCIPALE ========================
-def main():
-    """Fonction principale de l'application"""
+            
+            return selected
     
-    # Appliquer les styles CSS
-    apply_custom_css()
     
-    # Vérification du timeout de session
-    if st.session_state.authenticated:
-        if check_session_timeout():
+    # ======================== PAGE ADMINISTRATION (corrigée) ========================
+    def page_administration():
+        """Page d'administration"""
+        update_last_activity()
+        
+        # Vérification des droits
+        if st.session_state.role != "admin":
+            st.error("⛔ Accès réservé aux administrateurs")
             return
+        
+        st.markdown("## ⚙️ Administration")
+        
+        # Onglets
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "👥 Utilisateurs", "📋 Logs", "📜 Historique", 
+            "💾 Sauvegardes", "🔧 Paramètres"
+        ])
+        
+        with tab1:
+            st.markdown("### Gestion des utilisateurs")
+            
+            # Liste des utilisateurs
+            users = get_all_users()
+            
+            if users:
+                users_df = pd.DataFrame(users)
+                st.dataframe(users_df, use_container_width=True, hide_index=True)
+            
+            # Formulaire d'ajout
+            with st.expander("➕ Ajouter un utilisateur"):
+                with st.form("add_user_form"):
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        new_username = st.text_input("Nom d'utilisateur*")
+                        new_password = st.text_input("Mot de passe*", type="password")
+                    
+                    with col2:
+                        new_email = st.text_input("Email*")
+                        new_role = st.selectbox("Rôle", ["user", "admin"])
+                    
+                    if st.form_submit_button("Ajouter l'utilisateur", use_container_width=True):
+                        if new_username and new_password and new_email:
+                            success, message = add_user(new_username, new_password, new_email, new_role)
+                            if success:
+                                st.success(message)
+                                st.rerun()
+                            else:
+                                st.error(message)
+                        else:
+                            st.warning("Veuillez remplir tous les champs obligatoires")
+            
+            # Modification / Suppression
+            if users:
+                with st.expander("✏️ Modifier un utilisateur"):
+                    selected_user = st.selectbox(
+                        "Sélectionner un utilisateur",
+                        [u['username'] for u in users]
+                    )
+                    
+                    user_data = next((u for u in users if u['username'] == selected_user), None)
+                    
+                    if user_data:
+                        with st.form("edit_user_form"):
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                edit_email = st.text_input("Email", value=user_data.get('email', ''))
+                                edit_role = st.selectbox(
+                                    "Rôle",
+                                    ["user", "admin"],
+                                    index=0 if user_data.get('role') == 'user' else 1
+                                )
+                            
+                            with col2:
+                                edit_status = st.selectbox(
+                                    "Statut",
+                                    ["active", "inactive"],
+                                    index=0 if user_data.get('status') == 'active' else 1
+                                )
+                                edit_password = st.text_input("Nouveau mot de passe (optionnel)", type="password")
+                            
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                if st.form_submit_button("💾 Mettre à jour", use_container_width=True):
+                                    update_data = {
+                                        'email': edit_email,
+                                        'role': edit_role,
+                                        'status': edit_status
+                                    }
+                                    if edit_password:
+                                        update_data['password'] = edit_password
+                                    
+                                    success, message = update_user(selected_user, update_data)
+                                    if success:
+                                        st.success(message)
+                                        st.rerun()
+                                    else:
+                                        st.error(message)
+                            
+                            with col2:
+                                if st.form_submit_button("🗑️ Supprimer", use_container_width=True):
+                                    if selected_user != st.session_state.username:
+                                        success, message = delete_user(selected_user)
+                                        if success:
+                                            st.success(message)
+                                            st.rerun()
+                                        else:
+                                            st.error(message)
+                                    else:
+                                        st.error("Vous ne pouvez pas supprimer votre propre compte")
+        
+        with tab2:
+            st.markdown("### Journal des activités")
+            
+            if st.session_state.logs:
+                logs_df = pd.DataFrame(st.session_state.logs)
+                
+                # Filtres
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    if 'username' in logs_df.columns:
+                        users_filter = ["Tous"] + list(logs_df['username'].unique())
+                        selected_user = st.selectbox("Utilisateur", users_filter)
+                
+                with col2:
+                    if 'action' in logs_df.columns:
+                        actions_filter = ["Toutes"] + list(logs_df['action'].unique())
+                        selected_action = st.selectbox("Action", actions_filter)
+                
+                with col3:
+                    if 'level' in logs_df.columns:
+                        levels_filter = ["Tous"] + list(logs_df['level'].unique())
+                        selected_level = st.selectbox("Niveau", levels_filter)
+                
+                # Application des filtres
+                filtered_logs = logs_df.copy()
+                
+                if selected_user != "Tous":
+                    filtered_logs = filtered_logs[filtered_logs['username'] == selected_user]
+                
+                if selected_action != "Toutes":
+                    filtered_logs = filtered_logs[filtered_logs['action'] == selected_action]
+                
+                if selected_level != "Tous":
+                    filtered_logs = filtered_logs[filtered_logs['level'] == selected_level]
+                
+                # Affichage
+                st.dataframe(filtered_logs, use_container_width=True, height=500, hide_index=True)
+                
+                # Export
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if st.button("📥 Exporter les logs filtrés", use_container_width=True):
+                        output = export_to_excel([filtered_logs], ["Logs"], "logs_filtres.xlsx")
+                        if output:
+                            create_download_button(
+                                output,
+                                "logs_filtres.xlsx",
+                                "Télécharger Excel"
+                            )
+                
+                with col2:
+                    if st.button("🗑️ Effacer les logs", use_container_width=True):
+                        if st.checkbox("Confirmer la suppression"):
+                            st.session_state.logs = []
+                            st.success("Logs effacés")
+                            st.rerun()
+            else:
+                st.info("Aucun log disponible")
+        
+        with tab3:
+            st.markdown("### Historique des actions")
+            
+            if st.session_state.history:
+                history_df = pd.DataFrame(st.session_state.history)
+                
+                # Filtre par utilisateur
+                if 'username' in history_df.columns:
+                    users_filter = ["Tous"] + list(history_df['username'].unique())
+                    selected_user_hist = st.selectbox("Filtrer par utilisateur", users_filter, key="hist_user")
+                    
+                    if selected_user_hist != "Tous":
+                        history_df = history_df[history_df['username'] == selected_user_hist]
+                
+                st.dataframe(history_df, use_container_width=True, height=500, hide_index=True)
+                
+                # Export
+                if st.button("📥 Exporter l'historique", use_container_width=True):
+                    output = export_to_excel([history_df], ["Historique"], "historique_actions.xlsx")
+                    if output:
+                        create_download_button(
+                            output,
+                            "historique_actions.xlsx",
+                            "Télécharger Excel"
+                        )
+            else:
+                st.info("Aucun historique disponible")
+        
+        with tab4:
+            st.markdown("### Gestion des sauvegardes")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("💾 Créer une sauvegarde", use_container_width=True):
+                    with st.spinner("Création de la sauvegarde..."):
+                        # Créer un dossier backups si nécessaire
+                        os.makedirs("backups", exist_ok=True)
+                        
+                        # Créer une sauvegarde simple
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        backup_file = f"backups/backup_{timestamp}.db"
+                        
+                        if os.path.exists(DB_FILE):
+                            shutil.copy2(DB_FILE, backup_file)
+                            st.success(f"Sauvegarde créée: {os.path.basename(backup_file)}")
+                            st.balloons()
+                        else:
+                            st.error("Fichier de base de données introuvable")
+            
+            with col2:
+                # Liste des sauvegardes
+                backup_dir = "backups"
+                if os.path.exists(backup_dir):
+                    backups = [f for f in os.listdir(backup_dir) if f.startswith("backup_") and f.endswith(".db")]
+                    
+                    if backups:
+                        selected_backup = st.selectbox("Sauvegardes disponibles", backups)
+                        
+                        if st.button("🔄 Restaurer", use_container_width=True):
+                            if st.checkbox("Confirmer la restauration"):
+                                with st.spinner("Restauration en cours..."):
+                                    backup_path = os.path.join(backup_dir, selected_backup)
+                                    if os.path.exists(backup_path):
+                                        shutil.copy2(backup_path, DB_FILE)
+                                        st.success("Restauration réussie")
+                                        st.rerun()
+                                    else:
+                                        st.error("Fichier de sauvegarde introuvable")
+            
+            # Configuration des sauvegardes
+            st.markdown("### Configuration des sauvegardes")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                backup_interval = st.number_input(
+                    "Intervalle (heures)",
+                    min_value=1,
+                    max_value=168,
+                    value=24,
+                    help="Intervalle entre les sauvegardes automatiques"
+                )
+            
+            with col2:
+                keep_backups = st.number_input(
+                    "Nombre de sauvegardes à conserver",
+                    min_value=1,
+                    max_value=50,
+                    value=10,
+                    help="Nombre maximum de sauvegardes à garder"
+                )
+            
+            if st.button("💾 Sauvegarder la configuration", use_container_width=True):
+                st.success("Configuration sauvegardée")
+        
+        with tab5:
+            st.markdown("### Paramètres de sécurité")
+            
+            config = st.session_state.security_config
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("#### Politique de mot de passe")
+                
+                config['min_password_length'] = st.number_input(
+                    "Longueur minimale",
+                    min_value=6,
+                    max_value=20,
+                    value=config.get('min_password_length', 8)
+                )
+                
+                config['require_uppercase'] = st.checkbox(
+                    "Requiert des majuscules",
+                    value=config.get('require_uppercase', True)
+                )
+                
+                config['require_digit'] = st.checkbox(
+                    "Requiert des chiffres",
+                    value=config.get('require_digit', True)
+                )
+                
+                config['require_special'] = st.checkbox(
+                    "Requiert des caractères spéciaux",
+                    value=config.get('require_special', True)
+                )
+            
+            with col2:
+                st.markdown("#### Verrouillage de compte")
+                
+                config['max_login_attempts'] = st.number_input(
+                    "Tentatives maximales",
+                    min_value=3,
+                    max_value=10,
+                    value=config.get('max_login_attempts', 5)
+                )
+                
+                config['lockout_duration'] = st.number_input(
+                    "Durée de verrouillage (minutes)",
+                    min_value=5,
+                    max_value=1440,
+                    value=config.get('lockout_duration', 30)
+                )
+                
+                config['session_timeout'] = st.number_input(
+                    "Timeout de session (minutes)",
+                    min_value=5,
+                    max_value=120,
+                    value=config.get('session_timeout', 30)
+                )
+                
+                config['two_factor_enabled'] = st.checkbox(
+                    "Activer la double authentification",
+                    value=config.get('two_factor_enabled', False)
+                )
+            
+            if st.button("💾 Sauvegarder les paramètres", type="primary", use_container_width=True):
+                st.session_state.security_config = config
+                st.success("Paramètres de sécurité mis à jour")
+                log_action("Configuration", "Paramètres de sécurité modifiés")
     
-    # Affichage de la page appropriée
-    if not st.session_state.authenticated:
-        page_login()
-        return
     
-    # Menu latéral
-    selected = sidebar()
+    # ======================== FONCTION PRINCIPALE ========================
+    def main():
+        """Fonction principale de l'application"""
+        
+        # Appliquer les styles CSS
+        apply_custom_css()
+        
+        # Vérification du timeout de session
+        if st.session_state.authenticated:
+            if check_session_timeout():
+                return
+        
+        # Affichage de la page appropriée
+        if not st.session_state.authenticated:
+            page_login()
+            return
+        
+        # Menu latéral
+        selected = sidebar()
+        
+        # Mise à jour de la page courante
+        st.session_state.page = selected
+        
+        # Navigation vers la page sélectionnée
+        if selected == "Accueil":
+            page_accueil()
+        elif selected == "Gestion Technique":
+            page_gestion_technique()
+        elif selected == "Gestion Comptable":
+            page_gestion_comptable()
+        elif selected == "Rapprochement Technique":
+            page_rapprochement_technique()
+        elif selected == "Rapprochement Comptable":
+            page_rapprochement_comptable()
+        elif selected == "Gestion 410 & 411":
+            page_gestion_410_411()
+        elif selected == "Gestion Doublons":
+            page_gestion_doublons()
+        elif selected == "Gestion Production":
+            page_gestion_production()
+        elif selected == "Statistiques":
+            page_statistiques()
+        elif selected == "Administration":
+            page_administration()
+        elif selected == "Déconnexion":
+            logout()
     
-    # Mise à jour de la page courante
-    st.session_state.page = selected
     
-    # Navigation vers la page sélectionnée
-    if selected == "Accueil":
-        page_accueil()
-    elif selected == "Gestion Technique":
-        page_gestion_technique()
-    elif selected == "Gestion Comptable":
-        page_gestion_comptable()
-    elif selected == "Rapprochement Technique":
-        page_rapprochement_technique()
-    elif selected == "Rapprochement Comptable":
-        page_rapprochement_comptable()
-    elif selected == "Gestion 410 & 411":
-        page_gestion_410_411()
-    elif selected == "Gestion Doublons":
-        page_gestion_doublons()
-    elif selected == "Gestion Production":
-        page_gestion_production()
-    elif selected == "Statistiques":
-        page_statistiques()
-    elif selected == "Administration":
-        page_administration()
-    elif selected == "Déconnexion":
-        logout()
-
-# ======================== POINT D'ENTRÉE ========================
-if __name__ == "__main__":
-    # Initialisation de la session
-    init_session_state()
-    
-    # Exécution de l'application
-    try:
-        main()
-    except Exception as e:
-        st.error(f"Erreur critique: {str(e)}")
-        log_action("Erreur critique", str(e), level="error")
-        if os.getenv('ENVIRONMENT') == 'development':
-            st.exception(e)
+    # ======================== POINT D'ENTRÉE ========================
+    if __name__ == "__main__":
+        # Initialisation de la session
+        init_session_state()
+        
+        # Exécution de l'application
+        try:
+            main()
+        except Exception as e:
+            st.error(f"Erreur critique: {str(e)}")
+            log_action("Erreur critique", str(e), level="error")
+            if os.getenv('ENVIRONMENT') == 'development':
+                st.exception(e)
