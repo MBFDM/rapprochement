@@ -27,6 +27,9 @@ from contextlib import contextmanager
 from typing import Optional, Dict, List, Any, Tuple
 from pathlib import Path
 import tempfile
+import base64
+import os
+from PIL import Image
 
 # Tentative d'import des modules optionnels
 try:
@@ -3730,26 +3733,272 @@ def page_administration():
 
 
 # ======================== BARRE LATÉRALE ========================
-import base64
-import os
-
-def get_image_base64(image_path):
-    """Convertit une image en base64"""
-    try:
-        with open(image_path, "rb") as f:
-            return base64.b64encode(f.read()).decode()
-    except:
-        return None
-
-# ======================== BARRE LATÉRALE ========================
 def sidebar():
     """Affiche la barre latérale"""
     with st.sidebar:
-        try:
-            from PIL import Image
-            import os
+        # ============ CSS PERSONNALISÉ ============
+        st.markdown("""
+        <style>
+            /* Style de la barre latérale */
+            section[data-testid="stSidebar"] {
+                background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
+            }
             
-            # Vérifier si le fichier existe
+            /* Style du séparateur */
+            hr {
+                margin: 15px 0;
+                border: none;
+                height: 1px;
+                background: linear-gradient(90deg, transparent, rgba(0,0,0,0.1), transparent);
+            }
+            
+            /* ============ EN-TÊTE AVEC LOGO ============ */
+            .sidebar-header {
+                text-align: center;
+                padding: 20px 15px 15px 15px;
+                margin-bottom: 15px;
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                border-radius: 15px;
+                box-shadow: 0 4px 20px rgba(30, 60, 114, 0.3);
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .sidebar-header::before {
+                content: '';
+                position: absolute;
+                top: -50%;
+                right: -50%;
+                width: 100%;
+                height: 100%;
+                background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+                animation: pulse 3s ease-in-out infinite;
+            }
+            
+            @keyframes pulse {
+                0%, 100% { transform: scale(1); opacity: 0.5; }
+                50% { transform: scale(1.2); opacity: 1; }
+            }
+            
+            .sidebar-header .logo-container {
+                position: relative;
+                z-index: 1;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .sidebar-header .logo-wrapper {
+                position: relative;
+                width: 100px;
+                height: 100px;
+                margin: 0 auto 10px auto;
+            }
+            
+            .sidebar-header .logo-wrapper img {
+                width: 100px;
+                height: 100px;
+                border-radius: 50%;
+                border: 3px solid rgba(255,255,255,0.3);
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+                object-fit: cover;
+            }
+            
+            .sidebar-header .logo-wrapper img:hover {
+                transform: scale(1.1) rotate(-5deg);
+                border-color: rgba(255,255,255,0.8);
+                box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+            }
+            
+            .sidebar-header .logo-wrapper .logo-ring {
+                position: absolute;
+                top: -5px;
+                left: -5px;
+                right: -5px;
+                bottom: -5px;
+                border-radius: 50%;
+                border: 3px solid transparent;
+                border-top-color: #fff;
+                border-right-color: #fff;
+                animation: spin 3s linear infinite;
+            }
+            
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            
+            .sidebar-header .app-title {
+                position: relative;
+                z-index: 1;
+                color: white;
+                font-size: 1.8em;
+                font-weight: 700;
+                margin: 5px 0 2px 0;
+                text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                letter-spacing: 2px;
+            }
+            
+            .sidebar-header .app-subtitle {
+                position: relative;
+                z-index: 1;
+                color: rgba(255,255,255,0.8);
+                font-size: 0.85em;
+                margin: 0;
+                letter-spacing: 1px;
+            }
+            
+            .sidebar-header .app-version {
+                position: relative;
+                z-index: 1;
+                color: rgba(255,255,255,0.5);
+                font-size: 0.7em;
+                margin: 3px 0 0 0;
+                background: rgba(255,255,255,0.1);
+                padding: 2px 12px;
+                border-radius: 12px;
+                display: inline-block;
+            }
+            
+            .sidebar-header .decoration-line {
+                position: relative;
+                z-index: 1;
+                width: 50px;
+                height: 2px;
+                margin: 8px auto;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+            }
+            
+            /* ============ CARTE UTILISATEUR ============ */
+            .user-card {
+                background: rgba(255,255,255,0.95);
+                padding: 15px;
+                border-radius: 12px;
+                margin-bottom: 15px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+                border: 1px solid rgba(255,255,255,0.2);
+                transition: all 0.3s ease;
+            }
+            
+            .user-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            }
+            
+            .user-card .user-name {
+                color: #1e3c72;
+                margin: 0;
+                font-size: 1.1em;
+                font-weight: 600;
+            }
+            
+            .user-card .user-role {
+                margin: 5px 0 0 0;
+                font-size: 0.85em;
+                font-weight: 500;
+            }
+            
+            .user-card .user-role.admin {
+                color: #dc3545;
+            }
+            
+            .user-card .user-role.user {
+                color: #28a745;
+            }
+            
+            .user-card .user-time {
+                color: #999;
+                margin: 5px 0 0 0;
+                font-size: 0.75em;
+            }
+            
+            /* ============ CACHE LE LABEL RADIO ============ */
+            .stRadio > label {
+                display: none !important;
+            }
+            
+            /* ============ STREAMLIT RADIO OVERRIDE ============ */
+            div[data-testid="stRadio"] > div[role="radiogroup"] {
+                gap: 2px;
+            }
+            
+            div[data-testid="stRadio"] > div[role="radiogroup"] > label {
+                padding: 0;
+                margin: 0;
+                background: transparent !important;
+                border-radius: 10px;
+            }
+            
+            div[data-testid="stRadio"] > div[role="radiogroup"] > label > div {
+                display: none !important;
+            }
+            
+            div[data-testid="stRadio"] > div[role="radiogroup"] > label > div:last-child {
+                display: block !important;
+                width: 100%;
+            }
+            
+            /* Style des items du menu radio */
+            div[data-testid="stRadio"] > div[role="radiogroup"] > label > div:last-child > div {
+                padding: 0 !important;
+            }
+            
+            div[data-testid="stRadio"] > div[role="radiogroup"] > label > div:last-child p {
+                margin: 0 !important;
+                padding: 10px 15px !important;
+                border-radius: 10px !important;
+                font-weight: 500 !important;
+                color: #495057 !important;
+                transition: all 0.3s ease !important;
+                background: transparent !important;
+            }
+            
+            div[data-testid="stRadio"] > div[role="radiogroup"] > label > div:last-child p:hover {
+                background: rgba(30, 60, 114, 0.08) !important;
+                transform: translateX(5px) !important;
+                color: #1e3c72 !important;
+            }
+            
+            div[data-testid="stRadio"] > div[role="radiogroup"] > label[data-selected="true"] > div:last-child p {
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%) !important;
+                color: white !important;
+                box-shadow: 0 4px 15px rgba(30, 60, 114, 0.3) !important;
+                font-weight: 600 !important;
+            }
+            
+            /* ============ PIED DE PAGE ============ */
+            .sidebar-footer {
+                text-align: center;
+                color: #999;
+                font-size: 0.75em;
+                padding: 15px 10px;
+                margin-top: 20px;
+                border-top: 1px solid rgba(0,0,0,0.05);
+            }
+            
+            .sidebar-footer .footer-logo {
+                font-size: 1.5em;
+                margin-bottom: 5px;
+                opacity: 0.5;
+            }
+            
+            .sidebar-footer .footer-text {
+                margin: 2px 0;
+            }
+            
+            .sidebar-footer .footer-divider {
+                width: 30px;
+                height: 1px;
+                margin: 8px auto;
+                background: linear-gradient(90deg, transparent, #ddd, transparent);
+            }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # ============ EN-TÊTE AVEC LOGO ============
+        # Utiliser st.image pour afficher le logo
+        try:
             if os.path.exists("logo_1.jpg"):
                 logo = Image.open("logo_1.jpg")
                 st.image(logo, width=100)
@@ -3760,258 +4009,23 @@ def sidebar():
                 </div>
                 """, unsafe_allow_html=True)
         except:
-            # CSS personnalisé pour la barre latérale
             st.markdown("""
-            <style>
-                /* Style de la barre latérale */
-                section[data-testid="stSidebar"] {
-                    background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
-                }
-                
-                /* En-tête avec logo */
-                .sidebar-header {
-                    text-align: center;
-                    padding: 20px 15px 15px 15px;
-                    margin-bottom: 15px;
-                    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-                    border-radius: 15px;
-                    box-shadow: 0 4px 20px rgba(30, 60, 114, 0.3);
-                    position: relative;
-                    overflow: hidden;
-                }
-                
-                .sidebar-header::before {
-                    content: '';
-                    position: absolute;
-                    top: -50%;
-                    right: -50%;
-                    width: 100%;
-                    height: 100%;
-                    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-                    animation: pulse 3s ease-in-out infinite;
-                }
-                
-                @keyframes pulse {
-                    0%, 100% { transform: scale(1); opacity: 0.5; }
-                    50% { transform: scale(1.2); opacity: 1; }
-                }
-                
-                .sidebar-header .logo-container {
-                    position: relative;
-                    z-index: 1;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                }
-                
-                .sidebar-header .logo-wrapper {
-                    position: relative;
-                    width: 100px;
-                    height: 100px;
-                    margin: 0 auto 10px auto;
-                }
-                
-                .sidebar-header .logo-wrapper img {
-                    width: 100px;
-                    height: 100px;
-                    border-radius: 50%;
-                    border: 3px solid rgba(255,255,255,0.3);
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-                    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-                    object-fit: cover;
-                }
-                
-                .sidebar-header .logo-wrapper img:hover {
-                    transform: scale(1.1) rotate(-5deg);
-                    border-color: rgba(255,255,255,0.8);
-                    box-shadow: 0 8px 40px rgba(0,0,0,0.4);
-                }
-                
-                .sidebar-header .logo-wrapper .logo-ring {
-                    position: absolute;
-                    top: -5px;
-                    left: -5px;
-                    right: -5px;
-                    bottom: -5px;
-                    border-radius: 50%;
-                    border: 3px solid transparent;
-                    border-top-color: #fff;
-                    border-right-color: #fff;
-                    animation: spin 3s linear infinite;
-                }
-                
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-                
-                .sidebar-header .app-title {
-                    position: relative;
-                    z-index: 1;
-                    color: white;
-                    font-size: 1.8em;
-                    font-weight: 700;
-                    margin: 5px 0 2px 0;
-                    text-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                    letter-spacing: 2px;
-                }
-                
-                .sidebar-header .app-subtitle {
-                    position: relative;
-                    z-index: 1;
-                    color: rgba(255,255,255,0.8);
-                    font-size: 0.85em;
-                    margin: 0;
-                    letter-spacing: 1px;
-                }
-                
-                .sidebar-header .app-version {
-                    position: relative;
-                    z-index: 1;
-                    color: rgba(255,255,255,0.5);
-                    font-size: 0.7em;
-                    margin: 3px 0 0 0;
-                    background: rgba(255,255,255,0.1);
-                    padding: 2px 12px;
-                    border-radius: 12px;
-                    display: inline-block;
-                }
-                
-                .sidebar-header .decoration-line {
-                    position: relative;
-                    z-index: 1;
-                    width: 50px;
-                    height: 2px;
-                    margin: 8px auto;
-                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
-                }
-                
-                /* Carte utilisateur */
-                .user-card {
-                    background: rgba(255,255,255,0.9);
-                    padding: 15px;
-                    border-radius: 12px;
-                    margin-bottom: 15px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-                    backdrop-filter: blur(10px);
-                    border: 1px solid rgba(255,255,255,0.2);
-                    transition: all 0.3s ease;
-                }
-                
-                .user-card:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-                }
-                
-                .user-card .user-name {
-                    color: #1e3c72;
-                    margin: 0;
-                    font-size: 1.1em;
-                    font-weight: 600;
-                }
-                
-                .user-card .user-role {
-                    color: #28a745;
-                    margin: 5px 0 0 0;
-                    font-size: 0.85em;
-                    font-weight: 500;
-                }
-                
-                .user-card .user-role.admin {
-                    color: #dc3545;
-                }
-                
-                .user-card .user-time {
-                    color: #999;
-                    margin: 5px 0 0 0;
-                    font-size: 0.75em;
-                }
-                
-                /* Menu de navigation personnalisé */
-                .nav-item {
-                    padding: 10px 15px;
-                    margin: 3px 0;
-                    border-radius: 10px;
-                    color: #495057;
-                    font-weight: 500;
-                    transition: all 0.3s ease;
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                }
-                
-                .nav-item:hover {
-                    background: rgba(30, 60, 114, 0.08);
-                    transform: translateX(5px);
-                    color: #1e3c72;
-                }
-                
-                .nav-item.active {
-                    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-                    color: white;
-                    box-shadow: 0 4px 15px rgba(30, 60, 114, 0.3);
-                }
-                
-                .nav-item .nav-icon {
-                    font-size: 1.2em;
-                    width: 30px;
-                    text-align: center;
-                }
-                
-                /* Pied de page */
-                .sidebar-footer {
-                    text-align: center;
-                    color: #999;
-                    font-size: 0.75em;
-                    padding: 15px 10px;
-                    margin-top: 20px;
-                    border-top: 1px solid rgba(0,0,0,0.05);
-                }
-                
-                .sidebar-footer .footer-logo {
-                    font-size: 1.5em;
-                    margin-bottom: 5px;
-                    opacity: 0.5;
-                }
-                
-                .sidebar-footer .footer-text {
-                    margin: 2px 0;
-                }
-                
-                .sidebar-footer .footer-divider {
-                    width: 30px;
-                    height: 1px;
-                    margin: 8px auto;
-                    background: linear-gradient(90deg, transparent, #ddd, transparent);
-                }
-                .sidebar-header .logo-wrapper img {{
-                    width: 100px;
-                    height: 100px;
-                    border-radius: 50%;
-                    border: 3px solid rgba(255,255,255,0.3);
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-                    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-                    object-fit: cover;
-                }}
-            </style>
-            <div class="sidebar-header">
-                <div class="logo-container">
-                    <div class="logo-wrapper">
-                        <img src="{img_src}" alt="AGC-VIE Logo">
-                        <div class="logo-ring"></div>
-                    </div>
-                    <div class="app-title">AGC-VIE</div>
-                    <div class="decoration-line"></div>
-                    <div class="app-subtitle">Système de Gestion</div>
-                    <div class="app-version">v2.0</div>
-                </div>
+            <div style="text-align: center; font-size: 3em; margin-bottom: 10px;">
+                🏢
             </div>
             """, unsafe_allow_html=True)
-            
-        # Informations utilisateur améliorées
+        
+        st.markdown("""
+        <div style="text-align: center; margin-bottom: 15px;">
+            <h2 style="color: #1e3c72; margin: 5px 0 0 0; border-bottom: none;">AGC-VIE</h2>
+            <p style="color: #666; font-size: 0.85em; margin: 0;">Système de Gestion</p>
+            <p style="color: #999; font-size: 0.7em; margin: 2px 0 0 0;">Version 2.0</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # ============ CARTE UTILISATEUR ============
         if st.session_state.authenticated:
-            role_class = "admin" if st.session_state.role == "admin" else ""
+            role_class = "admin" if st.session_state.role == "admin" else "user"
             role_icon = "👑" if st.session_state.role == "admin" else "👤"
             role_text = "Administrateur" if st.session_state.role == "admin" else "Utilisateur"
             
@@ -4023,7 +4037,7 @@ def sidebar():
             </div>
             """, unsafe_allow_html=True)
         
-        # Menu de navigation amélioré avec style personnalisé
+        # ============ MENU DE NAVIGATION ============
         menu_options = {
             "Accueil": "🏠",
             "Gestion Technique": "📊",
@@ -4034,23 +4048,25 @@ def sidebar():
             "Gestion Doublons": "🔍",
             "Gestion Production": "📄",
             "Statistiques": "📈",
-            "Administration": "⚙️" if st.session_state.role == "admin" else None,
-            "Déconnexion": "🚪"
         }
         
-        # Filtrer les options
-        filtered_options = {k: v for k, v in menu_options.items() if v is not None}
+        # Options admin
+        if st.session_state.role == "admin":
+            menu_options["Administration"] = "⚙️"
         
-        # Radio stylisée
+        # Déconnexion en dernier
+        menu_options["Déconnexion"] = "🚪"
+        
+        # Radio stylisé
         selected = st.radio(
             "Navigation",
-            list(filtered_options.keys()),
-            format_func=lambda x: f"{filtered_options[x]} {x}",
+            list(menu_options.keys()),
+            format_func=lambda x: f"{menu_options[x]} {x}",
             key="navigation",
             label_visibility="collapsed"
         )
         
-        # Pied de page amélioré
+        # ============ PIED DE PAGE ============
         st.markdown("""
         <div class="sidebar-footer">
             <div class="footer-logo">🏢</div>
