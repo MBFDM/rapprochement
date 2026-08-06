@@ -4022,7 +4022,7 @@ def sidebar():
         try:
             if os.path.exists("logo_1.jpg"):
                 logo = Image.open("logo_1.jpg")
-                st.image(logo, width=100)
+                st.image(logo, width=200)
             else:
                 st.markdown("""
                 <div style="text-align: center; font-size: 3em; margin-bottom: 10px;">
@@ -4038,7 +4038,7 @@ def sidebar():
         
         st.markdown("""
         <div style="text-align: center; margin-bottom: 15px;">
-            <h2 style="color: #1e3c72; margin: 5px 0 0 0; border-bottom: none;">AGC-VIE</h2>
+            <!--h2 style="color: #1e3c72; margin: 5px 0 0 0; border-bottom: none;">AGC-VIE</h2-->
             <p style="color: #666; font-size: 0.85em; margin: 0;">Système de Gestion</p>
             <p style="color: #999; font-size: 0.7em; margin: 2px 0 0 0;">Version 2.0</p>
         </div>
