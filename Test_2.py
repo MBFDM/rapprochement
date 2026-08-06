@@ -3732,38 +3732,32 @@ def page_administration():
 def sidebar():
     """Affiche la barre latérale"""
     with st.sidebar:
-        # En-tête
+        # En-tête avec logo - Utilisation de st.image()
+        try:
+            from PIL import Image
+            import os
+            
+            # Vérifier si le fichier existe
+            if os.path.exists("logo_1.jpg"):
+                logo = Image.open("logo_1.jpg")
+                st.image(logo, width=100)
+            else:
+                st.markdown("""
+                <div style="text-align: center; font-size: 3em; margin-bottom: 10px;">
+                    🏢
+                </div>
+                """, unsafe_allow_html=True)
+        except:
+            st.markdown("""
+            <div style="text-align: center; font-size: 3em; margin-bottom: 10px;">
+                🏢
+            </div>
+            """, unsafe_allow_html=True)
+        
         st.markdown("""
-        <style>
-            .sidebar-logo {
-                text-align: center;
-                padding: 20px 10px 15px 10px;
-            }
-            .sidebar-logo img {
-                width: 100px;
-                height: auto;
-                border-radius: 50%;
-                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-                transition: transform 0.3s;
-            }
-            .sidebar-logo img:hover {
-                transform: scale(1.05);
-            }
-            .sidebar-logo h2 {
-                color: #1e3c72;
-                margin: 10px 0 5px 0;
-                border-bottom: none !important;
-            }
-            .sidebar-logo p {
-                color: #666;
-                font-size: 0.9em;
-                margin: 5px 0 0 0;
-            }
-        </style>
-        <div class="sidebar-logo">
-            <img src="logo_1.jpg" alt="AGC-VIE">
-            <h2>AGC-VIE</h2>
-            <p>Version 2.0</p>
+        <div style="text-align: center;">
+            <h2 style="color: #1e3c72; margin: 0; border-bottom: none;">AGC-VIE</h2>
+            <p style="color: #666; font-size: 0.9em; margin-top: 5px;">Version 2.0</p>
         </div>
         """, unsafe_allow_html=True)
         
