@@ -3736,6 +3736,7 @@ def sidebar():
         st.markdown("""
         <div style="text-align: center; padding: 20px 10px;">
             <h2 style="color: #1e3c72; margin-bottom: 5px;">AGC-VIE</h2>
+            <img src="logo_1.jpg">
             <p style="color: #666; font-size: 0.9em;">Version 2.0</p>
         </div>
         """, unsafe_allow_html=True)
