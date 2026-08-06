@@ -3731,7 +3731,28 @@ def page_administration():
             st.success("Paramètres de sécurité mis à jour")
             log_action("Configuration", "Paramètres de sécurité modifiés")
 
+def get_image_base64(image_path):
+    """Convertit une image en base64"""
+    try:
+        with open(image_path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    except:
+        return None
 
+def get_logo_src():
+    """Récupère la source du logo en base64 ou SVG fallback"""
+    # Essayer de charger l'image
+    image_paths = ["logo_1.jpg", "assets/logo_1.jpg", "static/logo_1.jpg", "logo.png", "assets/logo.png"]
+    
+    for path in image_paths:
+        if os.path.exists(path):
+            logo_b64 = get_image_base64(path)
+            if logo_b64:
+                ext = path.split('.')[-1]
+                return f"data:image/{ext};base64,{logo_b64}"
+    
+    # Fallback SVG si aucune image n'est trouvée
+    return "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgICA8ZGVmcz4KICAgICAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdyYWQiIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPgogICAgICAgICAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdHlsZT0ic3RvcC1jb2xvcjojNjY3ZWVhO3N0b3Atb3BhY2l0eToxIiAvPgogICAgICAgICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0eWxlPSJzdG9wLWNvbG9yOiM3NjRiYTI7c3RvcC1vcGFjaXR5OjEiIC8+CiAgICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwvZGVmcz4KICAgIDxyZWN0IHdpZHRoPSI5MCIgaGVpZ2h0PSI5MCIgeD0iNSIgeT0iNSIgcng9IjI1IiBmaWxsPSJ1cmwoI2dyYWQpIiAvPgogICAgPHRleHQgeD0iNTAiIHk9IjU1IiBmb250LXNpemU9IjQwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC13ZWlnaHQ9ImJvbGQiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiI+QVY8L3RleHQ+CiAgICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtZGFzaGFycmF5PSI1LDYiIG9wYWNpdHk9IjAuNSIgLz4KPC9zdmc+"
 # ======================== BARRE LATÉRALE ========================
 def sidebar():
     """Affiche la barre latérale"""
