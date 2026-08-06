@@ -96,13 +96,13 @@ def apply_custom_css():
         
         h1 {
             font-size: 2.5rem;
-            border-bottom: 3px solid #1e3c72;
+            #border-bottom: 3px solid #1e3c72;
             padding-bottom: 0.5rem;
         }
         
         h2 {
             font-size: 2rem;
-            border-bottom: 2px solid #2a5298;
+            #border-bottom: 2px solid #2a5298;
             padding-bottom: 0.3rem;
         }
         
@@ -1182,7 +1182,7 @@ def page_accueil():
             Système intégré de Gestion Technique et Comptable
         </p>
         <p style="color: white; font-size: 0.9em; opacity: 0.7; margin-top: 10px;">
-            Version 2.0 | {datetime.now().strftime('%d/%m/%Y %H:%M')}
+            Version 2.0
         </p>
     </div>
     """, unsafe_allow_html=True)
