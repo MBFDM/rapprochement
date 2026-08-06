@@ -3734,10 +3734,36 @@ def sidebar():
     with st.sidebar:
         # En-tête
         st.markdown("""
-        <div style="text-align: center; padding: 20px 10px;">
-            <h2 style="color: #1e3c72; margin-bottom: 5px;">AGC-VIE</h2>
-            <img src="logo_1.jpg">
-            <p style="color: #666; font-size: 0.9em;">Version 2.0</p>
+        <style>
+            .sidebar-logo {
+                text-align: center;
+                padding: 20px 10px 15px 10px;
+            }
+            .sidebar-logo img {
+                width: 80px;
+                height: auto;
+                border-radius: 50%;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+                transition: transform 0.3s;
+            }
+            .sidebar-logo img:hover {
+                transform: scale(1.05);
+            }
+            .sidebar-logo h2 {
+                color: #1e3c72;
+                margin: 10px 0 5px 0;
+                border-bottom: none !important;
+            }
+            .sidebar-logo p {
+                color: #666;
+                font-size: 0.9em;
+                margin: 5px 0 0 0;
+            }
+        </style>
+        <div class="sidebar-logo">
+            <img src="logo_1.jpg" alt="AGC-VIE">
+            <h2>AGC-VIE</h2>
+            <p>Version 2.0</p>
         </div>
         """, unsafe_allow_html=True)
         
