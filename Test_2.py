@@ -3730,39 +3730,276 @@ def page_administration():
 
 
 # ======================== BARRE LATÉRALE ========================
+# ======================== BARRE LATÉRALE ========================
 def sidebar():
     """Affiche la barre latérale"""
     with st.sidebar:
-        # En-tête
+        # CSS personnalisé pour la barre latérale
         st.markdown("""
-        <div style="text-align: center; padding: 20px 10px;">
-            <h2 style="color: #1e3c72; margin-bottom: 5px;">AGC-VIE</h2>
-            <p style="color: #666; font-size: 0.9em;">Version 2.0</p>
+        <style>
+            /* Style de la barre latérale */
+            section[data-testid="stSidebar"] {
+                background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
+            }
+            
+            /* En-tête avec logo */
+            .sidebar-header {
+                text-align: center;
+                padding: 20px 15px 15px 15px;
+                margin-bottom: 15px;
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                border-radius: 15px;
+                box-shadow: 0 4px 20px rgba(30, 60, 114, 0.3);
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .sidebar-header::before {
+                content: '';
+                position: absolute;
+                top: -50%;
+                right: -50%;
+                width: 100%;
+                height: 100%;
+                background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+                animation: pulse 3s ease-in-out infinite;
+            }
+            
+            @keyframes pulse {
+                0%, 100% { transform: scale(1); opacity: 0.5; }
+                50% { transform: scale(1.2); opacity: 1; }
+            }
+            
+            .sidebar-header .logo-container {
+                position: relative;
+                z-index: 1;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .sidebar-header .logo-wrapper {
+                position: relative;
+                width: 100px;
+                height: 100px;
+                margin: 0 auto 10px auto;
+            }
+            
+            .sidebar-header .logo-wrapper img {
+                width: 100px;
+                height: 100px;
+                border-radius: 50%;
+                border: 3px solid rgba(255,255,255,0.3);
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+                object-fit: cover;
+            }
+            
+            .sidebar-header .logo-wrapper img:hover {
+                transform: scale(1.1) rotate(-5deg);
+                border-color: rgba(255,255,255,0.8);
+                box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+            }
+            
+            .sidebar-header .logo-wrapper .logo-ring {
+                position: absolute;
+                top: -5px;
+                left: -5px;
+                right: -5px;
+                bottom: -5px;
+                border-radius: 50%;
+                border: 3px solid transparent;
+                border-top-color: #fff;
+                border-right-color: #fff;
+                animation: spin 3s linear infinite;
+            }
+            
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            
+            .sidebar-header .app-title {
+                position: relative;
+                z-index: 1;
+                color: white;
+                font-size: 1.8em;
+                font-weight: 700;
+                margin: 5px 0 2px 0;
+                text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                letter-spacing: 2px;
+            }
+            
+            .sidebar-header .app-subtitle {
+                position: relative;
+                z-index: 1;
+                color: rgba(255,255,255,0.8);
+                font-size: 0.85em;
+                margin: 0;
+                letter-spacing: 1px;
+            }
+            
+            .sidebar-header .app-version {
+                position: relative;
+                z-index: 1;
+                color: rgba(255,255,255,0.5);
+                font-size: 0.7em;
+                margin: 3px 0 0 0;
+                background: rgba(255,255,255,0.1);
+                padding: 2px 12px;
+                border-radius: 12px;
+                display: inline-block;
+            }
+            
+            .sidebar-header .decoration-line {
+                position: relative;
+                z-index: 1;
+                width: 50px;
+                height: 2px;
+                margin: 8px auto;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+            }
+            
+            /* Carte utilisateur */
+            .user-card {
+                background: rgba(255,255,255,0.9);
+                padding: 15px;
+                border-radius: 12px;
+                margin-bottom: 15px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255,255,255,0.2);
+                transition: all 0.3s ease;
+            }
+            
+            .user-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            }
+            
+            .user-card .user-name {
+                color: #1e3c72;
+                margin: 0;
+                font-size: 1.1em;
+                font-weight: 600;
+            }
+            
+            .user-card .user-role {
+                color: #28a745;
+                margin: 5px 0 0 0;
+                font-size: 0.85em;
+                font-weight: 500;
+            }
+            
+            .user-card .user-role.admin {
+                color: #dc3545;
+            }
+            
+            .user-card .user-time {
+                color: #999;
+                margin: 5px 0 0 0;
+                font-size: 0.75em;
+            }
+            
+            /* Menu de navigation personnalisé */
+            .nav-item {
+                padding: 10px 15px;
+                margin: 3px 0;
+                border-radius: 10px;
+                color: #495057;
+                font-weight: 500;
+                transition: all 0.3s ease;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            
+            .nav-item:hover {
+                background: rgba(30, 60, 114, 0.08);
+                transform: translateX(5px);
+                color: #1e3c72;
+            }
+            
+            .nav-item.active {
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                color: white;
+                box-shadow: 0 4px 15px rgba(30, 60, 114, 0.3);
+            }
+            
+            .nav-item .nav-icon {
+                font-size: 1.2em;
+                width: 30px;
+                text-align: center;
+            }
+            
+            /* Pied de page */
+            .sidebar-footer {
+                text-align: center;
+                color: #999;
+                font-size: 0.75em;
+                padding: 15px 10px;
+                margin-top: 20px;
+                border-top: 1px solid rgba(0,0,0,0.05);
+            }
+            
+            .sidebar-footer .footer-logo {
+                font-size: 1.5em;
+                margin-bottom: 5px;
+                opacity: 0.5;
+            }
+            
+            .sidebar-footer .footer-text {
+                margin: 2px 0;
+            }
+            
+            .sidebar-footer .footer-divider {
+                width: 30px;
+                height: 1px;
+                margin: 8px auto;
+                background: linear-gradient(90deg, transparent, #ddd, transparent);
+            }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # En-tête avec logo amélioré
+        st.markdown("""
+        <div class="sidebar-header">
+            <div class="logo-container">
+                <div class="logo-wrapper">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgICA8ZGVmcz4KICAgICAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdyYWQiIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPgogICAgICAgICAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdHlsZT0ic3RvcC1jb2xvcjojNjY3ZWVhO3N0b3Atb3BhY2l0eToxIiAvPgogICAgICAgICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0eWxlPSJzdG9wLWNvbG9yOiM3NjRiYTI7c3RvcC1vcGFjaXR5OjEiIC8+CiAgICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwvZGVmcz4KICAgIDxyZWN0IHdpZHRoPSI5MCIgaGVpZ2h0PSI5MCIgeD0iNSIgeT0iNSIgcng9IjI1IiBmaWxsPSJ1cmwoI2dyYWQpIiAvPgogICAgPHRleHQgeD0iNTAiIHk9IjU1IiBmb250LXNpemU9IjQwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC13ZWlnaHQ9ImJvbGQiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiI+QVY8L3RleHQ+CiAgICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtZGFzaGFycmF5PSI1LDYiIG9wYWNpdHk9IjAuNSIgLz4KPC9zdmc+" alt="AGC-VIE Logo">
+                    <div class="logo-ring"></div>
+                </div>
+                <div class="app-title">AGC-VIE</div>
+                <div class="decoration-line"></div>
+                <div class="app-subtitle">Système de Gestion</div>
+                <div class="app-version">v2.0</div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Informations utilisateur
+        # Informations utilisateur améliorées
         if st.session_state.authenticated:
+            role_class = "admin" if st.session_state.role == "admin" else ""
+            role_icon = "👑" if st.session_state.role == "admin" else "👤"
+            role_text = "Administrateur" if st.session_state.role == "admin" else "Utilisateur"
+            
             st.markdown(f"""
-            <div style="background: rgba(30, 60, 114, 0.1); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                <p style="color: #1e3c72; margin: 0; font-size: 1.1em;">👤 {st.session_state.username}</p>
-                <p style="color: #28a745; margin: 5px 0 0 0; font-size: 0.9em;">
-                    {'👑 Administrateur' if st.session_state.role == 'admin' else '👤 Utilisateur'}
-                </p>
-                <p style="color: #999; margin: 5px 0 0 0; font-size: 0.8em;">
-                    {datetime.now().strftime('%d/%m/%Y %H:%M')}
-                </p>
+            <div class="user-card">
+                <div class="user-name">👤 {st.session_state.username}</div>
+                <div class="user-role {role_class}">{role_icon} {role_text}</div>
+                <div class="user-time">🕐 {datetime.now().strftime('%d/%m/%Y %H:%M')}</div>
             </div>
             """, unsafe_allow_html=True)
         
-        # Menu de navigation
+        # Menu de navigation amélioré avec style personnalisé
         menu_options = {
             "Accueil": "🏠",
             "Gestion Technique": "📊",
             "Gestion Comptable": "💰",
             "Rapprochement Technique": "🔄",
-            "Rapprochement Comptable": "🔄",
-            "Gestion 410 & 411": "📋",
+            "Rapprochement Comptable": "📋",
+            "Gestion 410 & 411": "📁",
             "Gestion Doublons": "🔍",
             "Gestion Production": "📄",
             "Statistiques": "📈",
@@ -3773,6 +4010,7 @@ def sidebar():
         # Filtrer les options
         filtered_options = {k: v for k, v in menu_options.items() if v is not None}
         
+        # Radio stylisée
         selected = st.radio(
             "Navigation",
             list(filtered_options.keys()),
@@ -3781,12 +4019,15 @@ def sidebar():
             label_visibility="collapsed"
         )
         
-        # Pied de page
-        st.markdown("---")
+        # Pied de page amélioré
         st.markdown("""
-        <div style="text-align: center; color: #999; font-size: 0.8em; padding: 10px;">
-            <p>© 2025 AGC-VIE</p>
-            <p>Version 2.0</p>
+        <div class="sidebar-footer">
+            <div class="footer-logo">🏢</div>
+            <div class="footer-divider"></div>
+            <div class="footer-text">© 2025 AGC-VIE</div>
+            <div class="footer-text" style="color: #bbb;">Tous droits réservés</div>
+            <div class="footer-divider"></div>
+            <div class="footer-text" style="font-size: 0.7em; color: #ccc;">Made with ❤️</div>
         </div>
         """, unsafe_allow_html=True)
         
