@@ -1715,99 +1715,106 @@ def page_rapprochement_technique():
                 st.rerun()
         return
     
-    # Effectuer le rapprochement
-    with st.spinner("Calcul du rapprochement en cours..."):
-        try:
-            # Récupérer les données
-            df_tech = st.session_state.pivot_techniques.copy()
-            df_compta = st.session_state.pivot_comptables.copy()
-            
-            # Nettoyage des noms de colonnes
-            df_tech.columns = df_tech.columns.str.strip()
-            df_compta.columns = df_compta.columns.str.strip()
-            
-            # Déterminer les colonnes de police
-            tech_col = 'Nouvelle_Police' if 'Nouvelle_Police' in df_tech.columns else df_tech.columns[0]
-            compta_col = 'No Police' if 'No Police' in df_compta.columns else df_compta.columns[0]
-            
-            # Ajout de la colonne Débit et Crédit dans les données techniques
-            # (comme dans la fonction recuperer_debit_credit du Code 2)
-            df_tech['Débit'] = 'Introuvé'
-            df_tech['Crédit'] = 'Introuvé'
-            
-            for index, row in df_tech.iterrows():
-                police_tech = str(row[tech_col]).strip()
-                correspondance = df_compta[df_compta[compta_col].astype(str).str.strip() == police_tech]
-                
-                if not correspondance.empty:
-                    if 'Débit' in correspondance.columns:
-                        df_tech.at[index, 'Débit'] = correspondance['Débit'].values[0]
-                    if 'Crédit' in correspondance.columns:
-                        df_tech.at[index, 'Crédit'] = correspondance['Crédit'].values[0]
-            
-            # Conversion en numérique
-            numeric_cols = ['Crédit', 'Débit', 'Emissions', 'Ristournes', 'Chiffre affaire']
-            for col in numeric_cols:
-                if col in df_tech.columns:
-                    df_tech[col] = pd.to_numeric(df_tech[col], errors='coerce').fillna(0)
-            
-            # Vérification des polices (comme dans verifier_polices du Code 2)
-            total_emissions = df_tech['Emissions'].sum() if 'Emissions' in df_tech.columns else 0
-            total_ristournes = df_tech['Ristournes'].sum() if 'Ristournes' in df_tech.columns else 0
-            total_CA = abs(total_emissions + total_ristournes)
-            
-            total_credit_comptable = df_compta['Crédit'].sum() if 'Crédit' in df_compta.columns else 0
-            total_debit_comptable = df_compta['Débit'].sum() if 'Débit' in df_compta.columns else 0
-            total_CA_comptable = abs(total_credit_comptable - total_debit_comptable)
-            
-            ecart = abs(total_CA - total_CA_comptable)
-            
-            # Ajout de la colonne Rapprochement (comme dans le Code 2)
-            df_tech['Rapprochement'] = df_tech.apply(
-                lambda row: 'Rapprochement réussi'
-                if abs((row.get('Emissions', 0) + row.get('Ristournes', 0)) - 
-                       abs(row.get('Crédit', 0) - row.get('Débit', 0))) < 0.01 
-                else 'Rapprochement non réussi', 
-                axis=1
-            )
-            
-            # Tableaux de résultats
-            df_invalide = df_tech[df_tech['Rapprochement'] == 'Rapprochement non réussi'].copy()
-            df_valide = df_tech[df_tech['Rapprochement'] == 'Rapprochement réussi'].copy()
-            
-            # Statistiques (comme dans le Code 2)
-            stats = {
-                'total_polices': len(df_tech),
-                'polices_techniques': len(df_tech),
-                'polices_comptables': len(df_compta),
-                'total_emissions': total_emissions,
-                'total_ristournes': total_ristournes,
-                'total_CA': total_CA,
-                'total_CA_comptable': total_CA_comptable,
-                'ecart': ecart,
-                'total_credit_comptable': total_credit_comptable,
-                'total_debit_comptable': total_debit_comptable,
-                'polices_valides': len(df_valide),
-                'polices_invalides': len(df_invalide),
-                'taux_rapprochement': (len(df_valide) / len(df_tech) * 100) if len(df_tech) > 0 else 0
-            }
-            
-            # Stockage dans la session
-            st.session_state.df_tech_rapproche = df_tech
-            st.session_state.df_invalide_tech = df_invalide
-            st.session_state.df_valide_tech = df_valide
-            st.session_state.rapprochement_tech_stats = stats
-            
-            st.session_state.stats['total_verifications'] += 1
-            
-            log_action("Rapprochement technique", f"{len(df_tech)} polices analysées")
-            st.success("✅ Rapprochement technique terminé avec succès!")
-            st.balloons()
-            
-        except Exception as e:
-            st.error(f"❌ Erreur lors du rapprochement: {str(e)}")
-            log_action("Erreur rapprochement technique", str(e), level="error")
-            return
+    # Bouton pour lancer le rapprochement
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("🚀 Lancer le rapprochement technique", type="primary", key="btn_lancer_tech", use_container_width=True):
+            with st.spinner("Calcul du rapprochement technique en cours..."):
+                try:
+                    # Récupérer les données
+                    df_tech = st.session_state.pivot_techniques.copy()
+                    df_compta = st.session_state.pivot_comptables.copy()
+                    
+                    # Nettoyage des noms de colonnes
+                    df_tech.columns = df_tech.columns.str.strip()
+                    df_compta.columns = df_compta.columns.str.strip()
+                    
+                    # Déterminer les colonnes de police
+                    tech_col = 'Nouvelle_Police' if 'Nouvelle_Police' in df_tech.columns else df_tech.columns[0]
+                    compta_col = 'No Police' if 'No Police' in df_compta.columns else df_compta.columns[0]
+                    
+                    # Ajout de la colonne Débit et Crédit dans les données techniques
+                    # Conversion en string pour éviter les problèmes de type
+                    df_tech['Débit'] = 'Introuvé'
+                    df_tech['Crédit'] = 'Introuvé'
+                    
+                    for index, row in df_tech.iterrows():
+                        police_tech = str(row[tech_col]).strip()
+                        correspondance = df_compta[df_compta[compta_col].astype(str).str.strip() == police_tech]
+                        
+                        if not correspondance.empty:
+                            if 'Débit' in correspondance.columns:
+                                val_debit = correspondance['Débit'].values[0]
+                                # Convertir en string pour éviter les problèmes de type
+                                df_tech.at[index, 'Débit'] = str(val_debit) if pd.notna(val_debit) else '0'
+                            if 'Crédit' in correspondance.columns:
+                                val_credit = correspondance['Crédit'].values[0]
+                                df_tech.at[index, 'Crédit'] = str(val_credit) if pd.notna(val_credit) else '0'
+                    
+                    # Conversion en numérique pour les calculs
+                    numeric_cols = ['Crédit', 'Débit', 'Emissions', 'Ristournes', 'Chiffre affaire']
+                    for col in numeric_cols:
+                        if col in df_tech.columns:
+                            df_tech[col] = pd.to_numeric(df_tech[col], errors='coerce').fillna(0)
+                    
+                    # Vérification des polices
+                    total_emissions = df_tech['Emissions'].sum() if 'Emissions' in df_tech.columns else 0
+                    total_ristournes = df_tech['Ristournes'].sum() if 'Ristournes' in df_tech.columns else 0
+                    total_CA = abs(total_emissions + total_ristournes)
+                    
+                    total_credit_comptable = df_compta['Crédit'].sum() if 'Crédit' in df_compta.columns else 0
+                    total_debit_comptable = df_compta['Débit'].sum() if 'Débit' in df_compta.columns else 0
+                    total_CA_comptable = abs(total_credit_comptable - total_debit_comptable)
+                    
+                    ecart = abs(total_CA - total_CA_comptable)
+                    
+                    # Ajout de la colonne Rapprochement
+                    df_tech['Rapprochement'] = df_tech.apply(
+                        lambda row: 'Rapprochement réussi'
+                        if abs((row.get('Emissions', 0) + row.get('Ristournes', 0)) - 
+                               abs(row.get('Crédit', 0) - row.get('Débit', 0))) < 0.01 
+                        else 'Rapprochement non réussi', 
+                        axis=1
+                    )
+                    
+                    # Tableaux de résultats
+                    df_invalide = df_tech[df_tech['Rapprochement'] == 'Rapprochement non réussi'].copy()
+                    df_valide = df_tech[df_tech['Rapprochement'] == 'Rapprochement réussi'].copy()
+                    
+                    # Statistiques
+                    stats = {
+                        'total_polices': len(df_tech),
+                        'polices_techniques': len(df_tech),
+                        'polices_comptables': len(df_compta),
+                        'total_emissions': total_emissions,
+                        'total_ristournes': total_ristournes,
+                        'total_CA': total_CA,
+                        'total_CA_comptable': total_CA_comptable,
+                        'ecart': ecart,
+                        'total_credit_comptable': total_credit_comptable,
+                        'total_debit_comptable': total_debit_comptable,
+                        'polices_valides': len(df_valide),
+                        'polices_invalides': len(df_invalide),
+                        'taux_rapprochement': (len(df_valide) / len(df_tech) * 100) if len(df_tech) > 0 else 0
+                    }
+                    
+                    # Stockage dans la session
+                    st.session_state.df_tech_rapproche = df_tech
+                    st.session_state.df_invalide_tech = df_invalide
+                    st.session_state.df_valide_tech = df_valide
+                    st.session_state.rapprochement_tech_stats = stats
+                    
+                    st.session_state.stats['total_verifications'] += 1
+                    
+                    log_action("Rapprochement technique", f"{len(df_tech)} polices analysées")
+                    st.success("✅ Rapprochement technique terminé avec succès!")
+                    st.balloons()
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"❌ Erreur lors du rapprochement: {str(e)}")
+                    log_action("Erreur rapprochement technique", str(e), level="error")
+                    return
     
     # Vérifier si les résultats existent
     if 'rapprochement_tech_stats' not in st.session_state:
@@ -1988,17 +1995,6 @@ def page_rapprochement_technique():
             if search_invalide:
                 df_invalide_display = filter_dataframe(df_invalide_display, search_invalide)
             
-            # Statistiques des invalides
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Total non rapprochées", len(df_invalide))
-            with col2:
-                if 'Écart' in df_invalide.columns:
-                    st.metric("Écart moyen", f"{df_invalide['Écart'].mean():,.0f} FCFA")
-            with col3:
-                if 'Écart' in df_invalide.columns:
-                    st.metric("Écart max", f"{df_invalide['Écart'].max():,.0f} FCFA")
-            
             st.dataframe(df_invalide_display, use_container_width=True, height=500, hide_index=True)
             
             # Export des non rapprochées
@@ -2124,7 +2120,6 @@ def page_rapprochement_technique():
     
     with col1:
         if st.button("📥 Exporter le rapport complet", type="primary", key="btn_tech_export_complet", use_container_width=True):
-            # Créer un fichier Excel avec plusieurs onglets
             dataframes = []
             sheet_names = []
             
@@ -2167,14 +2162,6 @@ def page_rapprochement_technique():
     with col2:
         if st.button("📊 Exporter les graphiques", key="btn_tech_export_graph", use_container_width=True):
             st.info("Fonctionnalité à venir: export des graphiques en PNG")
-    
-    # Journalisation
-    log_action(
-        "Rapprochement technique", 
-        f"{stats.get('total_polices', 0)} polices analysées, "
-        f"{stats.get('polices_invalides', 0)} non rapprochées, "
-        f"écart: {stats.get('ecart', 0):,.0f} FCFA"
-    )
 
 def page_rapprochement_comptable():
     """Page de rapprochement comptable - Version adaptée du Code 2"""
@@ -2209,97 +2196,103 @@ def page_rapprochement_comptable():
                 st.rerun()
         return
     
-    # Effectuer le rapprochement
-    with st.spinner("Calcul du rapprochement comptable en cours..."):
-        try:
-            # Récupérer les données
-            df_tech = st.session_state.pivot_techniques.copy()
-            df_compta = st.session_state.pivot_comptables.copy()
-            
-            # Nettoyage des noms de colonnes
-            df_tech.columns = df_tech.columns.str.strip()
-            df_compta.columns = df_compta.columns.str.strip()
-            
-            # Déterminer les colonnes de police
-            tech_col = 'Nouvelle_Police' if 'Nouvelle_Police' in df_tech.columns else df_tech.columns[0]
-            compta_col = 'No Police' if 'No Police' in df_compta.columns else df_compta.columns[0]
-            
-            # Ajout des colonnes Ristournes et Emissions dans les données comptables
-            # (comme dans la fonction recuperer_annulations_emisions du Code 2)
-            df_compta['Ristournes'] = 'Introuvé'
-            df_compta['Emissions'] = 'Introuvé'
-            
-            for index, row in df_compta.iterrows():
-                police_compta = str(row[compta_col]).strip()
-                correspondance = df_tech[df_tech[tech_col].astype(str).str.strip() == police_compta]
-                
-                if not correspondance.empty:
-                    if 'Ristournes' in correspondance.columns:
-                        df_compta.at[index, 'Ristournes'] = correspondance['Ristournes'].values[0]
-                    if 'Emissions' in correspondance.columns:
-                        df_compta.at[index, 'Emissions'] = correspondance['Emissions'].values[0]
-            
-            # Conversion en numérique
-            numeric_cols = ['Crédit', 'Débit', 'Emissions', 'Ristournes']
-            for col in numeric_cols:
-                if col in df_compta.columns:
-                    df_compta[col] = pd.to_numeric(df_compta[col], errors='coerce').fillna(0)
-            
-            # Vérification des polices comptables (comme dans verifier_polices_comptable du Code 2)
-            total_debit = df_compta['Débit'].sum() if 'Débit' in df_compta.columns else 0
-            total_credit = df_compta['Crédit'].sum() if 'Crédit' in df_compta.columns else 0
-            total_CA = abs(total_credit - total_debit)
-            
-            total_emissions_tech = df_tech['Emissions'].sum() if 'Emissions' in df_tech.columns else 0
-            total_ristournes_tech = df_tech['Ristournes'].sum() if 'Ristournes' in df_tech.columns else 0
-            total_CA_technique = abs(total_emissions_tech + total_ristournes_tech)
-            
-            ecart = abs(total_CA_technique - total_CA)
-            
-            # Ajout de la colonne Rapprochement (comme dans le Code 2)
-            df_compta['Rapprochement'] = df_compta.apply(
-                lambda row: 'Rapprochement réussi' 
-                if abs((row.get('Crédit', 0) - row.get('Débit', 0)) - 
-                       (row.get('Emissions', 0) + row.get('Ristournes', 0))) < 0.01 
-                else 'Rapprochement non réussi', 
-                axis=1
-            )
-            
-            # Tableaux de résultats
-            df_invalide = df_compta[df_compta['Rapprochement'] == 'Rapprochement non réussi'].copy()
-            df_valide = df_compta[df_compta['Rapprochement'] == 'Rapprochement réussi'].copy()
-            
-            # Statistiques (comme dans le Code 2)
-            stats = {
-                'total_polices': len(df_compta),
-                'total_debit': total_debit,
-                'total_credit': total_credit,
-                'total_CA': total_CA,
-                'total_emissions_tech': total_emissions_tech,
-                'total_ristournes_tech': total_ristournes_tech,
-                'total_CA_technique': total_CA_technique,
-                'ecart': ecart,
-                'polices_valides': len(df_valide),
-                'polices_invalides': len(df_invalide),
-                'taux_rapprochement': (len(df_valide) / len(df_compta) * 100) if len(df_compta) > 0 else 0
-            }
-            
-            # Stockage dans la session
-            st.session_state.df_compta_rapproche = df_compta
-            st.session_state.df_invalide_compta = df_invalide
-            st.session_state.df_valide_compta = df_valide
-            st.session_state.rapprochement_compta_stats = stats
-            
-            st.session_state.stats['total_verifications'] += 1
-            
-            log_action("Rapprochement comptable", f"{len(df_compta)} polices analysées")
-            st.success("✅ Rapprochement comptable terminé avec succès!")
-            st.balloons()
-            
-        except Exception as e:
-            st.error(f"❌ Erreur lors du rapprochement: {str(e)}")
-            log_action("Erreur rapprochement comptable", str(e), level="error")
-            return
+    # Bouton pour lancer le rapprochement
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("🚀 Lancer le rapprochement comptable", type="primary", key="btn_lancer_compta", use_container_width=True):
+            with st.spinner("Calcul du rapprochement comptable en cours..."):
+                try:
+                    # Récupérer les données
+                    df_tech = st.session_state.pivot_techniques.copy()
+                    df_compta = st.session_state.pivot_comptables.copy()
+                    
+                    # Nettoyage des noms de colonnes
+                    df_tech.columns = df_tech.columns.str.strip()
+                    df_compta.columns = df_compta.columns.str.strip()
+                    
+                    # Déterminer les colonnes de police
+                    tech_col = 'Nouvelle_Police' if 'Nouvelle_Police' in df_tech.columns else df_tech.columns[0]
+                    compta_col = 'No Police' if 'No Police' in df_compta.columns else df_compta.columns[0]
+                    
+                    # Ajout des colonnes Ristournes et Emissions dans les données comptables
+                    # Conversion en string pour éviter les problèmes de type
+                    df_compta['Ristournes'] = 'Introuvé'
+                    df_compta['Emissions'] = 'Introuvé'
+                    
+                    for index, row in df_compta.iterrows():
+                        police_compta = str(row[compta_col]).strip()
+                        correspondance = df_tech[df_tech[tech_col].astype(str).str.strip() == police_compta]
+                        
+                        if not correspondance.empty:
+                            if 'Ristournes' in correspondance.columns:
+                                val_ristournes = correspondance['Ristournes'].values[0]
+                                df_compta.at[index, 'Ristournes'] = str(val_ristournes) if pd.notna(val_ristournes) else '0'
+                            if 'Emissions' in correspondance.columns:
+                                val_emissions = correspondance['Emissions'].values[0]
+                                df_compta.at[index, 'Emissions'] = str(val_emissions) if pd.notna(val_emissions) else '0'
+                    
+                    # Conversion en numérique pour les calculs
+                    numeric_cols = ['Crédit', 'Débit', 'Emissions', 'Ristournes']
+                    for col in numeric_cols:
+                        if col in df_compta.columns:
+                            df_compta[col] = pd.to_numeric(df_compta[col], errors='coerce').fillna(0)
+                    
+                    # Vérification des polices comptables
+                    total_debit = df_compta['Débit'].sum() if 'Débit' in df_compta.columns else 0
+                    total_credit = df_compta['Crédit'].sum() if 'Crédit' in df_compta.columns else 0
+                    total_CA = abs(total_credit - total_debit)
+                    
+                    total_emissions_tech = df_tech['Emissions'].sum() if 'Emissions' in df_tech.columns else 0
+                    total_ristournes_tech = df_tech['Ristournes'].sum() if 'Ristournes' in df_tech.columns else 0
+                    total_CA_technique = abs(total_emissions_tech + total_ristournes_tech)
+                    
+                    ecart = abs(total_CA_technique - total_CA)
+                    
+                    # Ajout de la colonne Rapprochement
+                    df_compta['Rapprochement'] = df_compta.apply(
+                        lambda row: 'Rapprochement réussi' 
+                        if abs((row.get('Crédit', 0) - row.get('Débit', 0)) - 
+                               (row.get('Emissions', 0) + row.get('Ristournes', 0))) < 0.01 
+                        else 'Rapprochement non réussi', 
+                        axis=1
+                    )
+                    
+                    # Tableaux de résultats
+                    df_invalide = df_compta[df_compta['Rapprochement'] == 'Rapprochement non réussi'].copy()
+                    df_valide = df_compta[df_compta['Rapprochement'] == 'Rapprochement réussi'].copy()
+                    
+                    # Statistiques
+                    stats = {
+                        'total_polices': len(df_compta),
+                        'total_debit': total_debit,
+                        'total_credit': total_credit,
+                        'total_CA': total_CA,
+                        'total_emissions_tech': total_emissions_tech,
+                        'total_ristournes_tech': total_ristournes_tech,
+                        'total_CA_technique': total_CA_technique,
+                        'ecart': ecart,
+                        'polices_valides': len(df_valide),
+                        'polices_invalides': len(df_invalide),
+                        'taux_rapprochement': (len(df_valide) / len(df_compta) * 100) if len(df_compta) > 0 else 0
+                    }
+                    
+                    # Stockage dans la session
+                    st.session_state.df_compta_rapproche = df_compta
+                    st.session_state.df_invalide_compta = df_invalide
+                    st.session_state.df_valide_compta = df_valide
+                    st.session_state.rapprochement_compta_stats = stats
+                    
+                    st.session_state.stats['total_verifications'] += 1
+                    
+                    log_action("Rapprochement comptable", f"{len(df_compta)} polices analysées")
+                    st.success("✅ Rapprochement comptable terminé avec succès!")
+                    st.balloons()
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"❌ Erreur lors du rapprochement: {str(e)}")
+                    log_action("Erreur rapprochement comptable", str(e), level="error")
+                    return
     
     # Vérifier si les résultats existent
     if 'rapprochement_compta_stats' not in st.session_state:
@@ -2525,17 +2518,6 @@ def page_rapprochement_comptable():
             if search_invalide:
                 df_invalide_display = filter_dataframe(df_invalide_display, search_invalide)
             
-            # Statistiques des invalides
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Total non rapprochées", len(df_invalide))
-            with col2:
-                if 'Écart' in df_invalide.columns:
-                    st.metric("Écart moyen", f"{df_invalide['Écart'].mean():,.0f} FCFA")
-            with col3:
-                if 'Écart' in df_invalide.columns:
-                    st.metric("Écart max", f"{df_invalide['Écart'].max():,.0f} FCFA")
-            
             st.dataframe(df_invalide_display, use_container_width=True, height=500, hide_index=True)
             
             # Export des non rapprochées
@@ -2659,7 +2641,6 @@ def page_rapprochement_comptable():
     
     with col1:
         if st.button("📥 Exporter le rapport complet", type="primary", key="btn_compta_export_complet", use_container_width=True):
-            # Créer un fichier Excel avec plusieurs onglets
             dataframes = []
             sheet_names = []
             
